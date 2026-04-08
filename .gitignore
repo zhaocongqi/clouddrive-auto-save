@@ -1,0 +1,51 @@
+# OS specific
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE / Editor
+.idea/
+.vscode/
+*.swp
+*.suo
+*.swo
+*~
+*.bak
+
+# Go binaries and tools
+ucas
+server
+bin/
+*.exe
+*.test
+*.prof
+*.out
+vendor/
+
+# Node.js / Frontend
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+web/dist/
+web/dist-ssr/
+web/*.local
+
+# Local Data & Database
+data/
+data.db
+*.sqlite
+*.sqlite3
+*.db
+*.db-shm
+*.db-wal
+
+# Environment Variables
+.env
+.env.local
+.env.*.local
