@@ -7,6 +7,18 @@
 - **Method**: `GET`
 - **Response**: `Array<Account>`
 
+### Account 对象结构
+| 字段 | 类型 | 说明 |
+| :--- | :--- | :--- |
+| `id` | uint | 账号唯一标识 |
+| `platform` | string | `139` 或 `quark` |
+| `nickname` | string | 云盘真实昵称 |
+| `vip_name` | string | 会员等级（如：白银会员、SVIP） |
+| `capacity_used`| int64 | 已用容量 (Bytes) |
+| `capacity_total`| int64 | 总容量 (Bytes) |
+| `status` | int | 状态 (1:正常, 0:失效) |
+| `last_check` | string | 最后一次校验的时间戳 |
+
 ---
 
 ## 2. 添加新账号
@@ -24,16 +36,25 @@
 
 ---
 
-## 3. 账号有效性校验
-手动触发后端模拟登录，校验凭证是否有效并更新昵称。
+## 3. 更新账号信息
+修改已存在的账号配置。
 
-- **URL**: `/accounts/:id/check`
-- **Method**: `POST`
-- **Response**: 返回更新后的账号对象或 401 错误。
+- **URL**: `/accounts/:id`
+- **Method**: `PUT`
+- **Payload**: 与添加账号一致（仅需传递待修改字段）。
 
 ---
 
-## 4. 删除账号
+## 4. 账号有效性校验
+手动触发后端模拟登录，校验凭证是否有效并更新昵称、容量及会员信息。
+
+- **URL**: `/accounts/:id/check`
+- **Method**: `POST`
+- **Response**: 返回更新后的账号对象。
+
+---
+
+## 5. 删除账号
 彻底移除该账号信息。
 
 - **URL**: `/accounts/:id`
