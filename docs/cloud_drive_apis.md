@@ -78,10 +78,18 @@
   - 调用移动端接口（容量、签到）需从 Cookie 中提取 `kps`, `sign`, `vcode` 作为 URL 参数。
 
 ### 2.2 账号与用户接口
-- **账号基础信息**: 
+- **获取基础信息 (昵称)**: 
   - `GET https://pan.quark.cn/account/info`
-  - 返回: `nickname`。
-- **会员容量信息 (App端)**: 
+- **会员与容量信息 (PC Web端 - 最新推荐)**:
+  - `GET https://pan.quark.cn/1/clouddrive/member?pr=ucpro&fr=pc`
+  - **重要返回结构**:
+    - `data.total_capacity`: 总空间 (Bytes)。
+    - `data.use_capacity`: 已用空间 (Bytes)。
+    - `data.member_type`: 会员类型 (字符串，如 "NORMAL", "SUPER_VIP")。
+- **备选容量接口 (PC Web端)**:
+  - `GET https://drive-pc.quark.cn/1/clouddrive/capacity?pr=ucpro&fr=pc`
+  - 返回: `data.cap_info.total`, `data.cap_info.used`。
+- **会员容量信息 (App端 - 需鉴权参数)**: 
   - `GET /1/clouddrive/capacity/growth/info` (App Host)
   - 参数: `pr=ucpro&fr=android&kps=...&sign=...&vcode=...`
   - 返回: `total_capacity`, `used_capacity`, `member_type`。
