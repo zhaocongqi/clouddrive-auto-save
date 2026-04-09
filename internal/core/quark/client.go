@@ -144,6 +144,9 @@ func (q *Quark) GetInfo(ctx context.Context) (*db.Account, error) {
 	q.account.Nickname = nickname
 	q.account.Status = 1
 	q.account.LastCheck = time.Now()
+	if q.account.AccountName == "" {
+		q.account.AccountName = nickname
+	}
 
 	// 2. 获取容量和 VIP 信息
 	if q.mparam["kps"] != "" {

@@ -165,30 +165,51 @@ func (c *Cloud139) GetInfo(ctx context.Context) (*db.Account, error) {
 		return nil, err
 	}
 
-	var res struct {
-		Code string `json:"code"`
-		Data struct {
-			UserDomainID string `json:"userDomainId"`
-			Nickname     string `json:"userName"`
-			LoginName    string `json:"loginName"`
-			Account      string `json:"account"`
-		} `json:"data"`
-		Auth struct {
-			MemberLevel int `json:"memberLevel"`
-		} `json:"auth"`
-	}
-	if err := json.Unmarshal(resp, &res); err != nil {
+	var resRaw map[string]interface{}
+	if err := json.Unmarshal(resp, &resRaw); err != nil {
 		return nil, err
 	}
-	if res.Code != "0000" && res.Code != "0" {
-		return nil, fmt.Errorf("API error: %s", res.Code)
+
+	// 打印调试日志，方便定位昵称获取失败原因
+	// fmt.Printf("[139 Debug] getUser response: %s\n", string(resp))
+
+	code := ""
+	switch v := resRaw["code"].(type) {
+	case string:
+		code = v
+	case float64:
+		code = fmt.Sprintf("%.0f", v)
 	}
 
-	nickname := res.Data.Nickname
-	phone := res.Data.LoginName
-	if phone == "" {
-		phone = res.Data.Account
+	if code != "0000" && code != "0" && code != "" {
+		return nil, fmt.Errorf("API error: %s", code)
 	}
+
+	// 139 的核心数据可能在顶层、data 或 result 节点下，进行深度探测
+	data, _ := resRaw["data"].(map[string]interface{})
+	if data == nil {
+		data, _ = resRaw["result"].(map[string]interface{})
+	}
+	if data == nil {
+		data = resRaw
+	}
+
+	nickname, _ := data["userName"].(string)
+	if nickname == "" {
+		nickname, _ = data["nickName"].(string)
+	}
+	// 关键修复：探测 userProfileInfo 节点
+	if nickname == "" {
+		if profile, ok := data["userProfileInfo"].(map[string]interface{}); ok {
+			nickname, _ = profile["userName"].(string)
+		}
+	}
+
+	phone, _ := data["loginName"].(string)
+	if phone == "" {
+		phone, _ = data["account"].(string)
+	}
+	userDomainID, _ := data["userDomainId"].(string)
 
 	if nickname == "" {
 		nickname = phone
@@ -197,34 +218,48 @@ func (c *Cloud139) GetInfo(ctx context.Context) (*db.Account, error) {
 		nickname = c.account.AccountName
 	}
 	if nickname == "" {
-		nickname = "139 User"
+		nickname = "移动云盘用户"
 	}
 
 	c.account.Nickname = nickname
 	c.account.Status = 1
 	c.account.LastCheck = time.Now()
+	
+	// 自动填充账号名（如果数据库里是空的）
+	if c.account.AccountName == "" {
+		if phone != "" {
+			c.account.AccountName = phone
+		} else {
+			c.account.AccountName = nickname
+		}
+	}
 
-	// 尝试从 getUser 返回的 auth 节点直接获取会员等级
+	// 尝试从 auth 节点获取会员等级
+	auth, _ := resRaw["auth"].(map[string]interface{})
 	vipLevels := map[int]string{0: "普通用户", 1: "白银会员", 2: "黄金会员", 3: "钻石会员"}
-	if res.Auth.MemberLevel > 0 {
-		c.account.VipName = vipLevels[res.Auth.MemberLevel]
+	if auth != nil {
+		if ml, ok := auth["memberLevel"].(float64); ok && ml > 0 {
+			c.account.VipName = vipLevels[int(ml)]
+		}
 	}
 
 	// 2. 获取磁盘容量信息
-	diskReq := map[string]interface{}{"userDomainId": res.Data.UserDomainID}
-	diskResp, err := c.doRequest(ctx, "POST", UserNjsURL+"/user/disk/getPersonalDiskInfo", diskReq, headers)
-	if err == nil {
-		var diskRes struct {
-			Data struct {
-				DiskSize     string `json:"diskSize"`
-				FreeDiskSize string `json:"freeDiskSize"`
-			} `json:"data"`
-		}
-		if json.Unmarshal(diskResp, &diskRes) == nil {
-			total, _ := strconv.ParseInt(diskRes.Data.DiskSize, 10, 64)
-			free, _ := strconv.ParseInt(diskRes.Data.FreeDiskSize, 10, 64)
-			c.account.CapacityTotal = total * 1024 * 1024 // MB to B
-			c.account.CapacityUsed = (total - free) * 1024 * 1024
+	if userDomainID != "" {
+		diskReq := map[string]interface{}{"userDomainId": userDomainID}
+		diskResp, err := c.doRequest(ctx, "POST", UserNjsURL+"/user/disk/getPersonalDiskInfo", diskReq, headers)
+		if err == nil {
+			var diskRes struct {
+				Data struct {
+					DiskSize     string `json:"diskSize"`
+					FreeDiskSize string `json:"freeDiskSize"`
+				} `json:"data"`
+			}
+			if json.Unmarshal(diskResp, &diskRes) == nil {
+				total, _ := strconv.ParseInt(diskRes.Data.DiskSize, 10, 64)
+				free, _ := strconv.ParseInt(diskRes.Data.FreeDiskSize, 10, 64)
+				c.account.CapacityTotal = total * 1024 * 1024 // MB to B
+				c.account.CapacityUsed = (total - free) * 1024 * 1024
+			}
 		}
 	}
 

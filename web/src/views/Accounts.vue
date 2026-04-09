@@ -40,7 +40,6 @@
             <span v-else>-</span>
           </template>
         </el-table-column>
-        <el-table-column prop="account_name" label="账号/手机号" width="150" />
         <el-table-column label="状态" width="100">
           <template #default="{ row }">
             <el-badge :is-dot="true" :type="row.status === 1 ? 'success' : 'danger'">
@@ -73,10 +72,6 @@
             <el-radio-button label="139">移动云盘</el-radio-button>
             <el-radio-button label="quark">夸克网盘</el-radio-button>
           </el-radio-group>
-        </el-form-item>
-
-        <el-form-item label="备注/手机号" required>
-          <el-input v-model="accountForm.account_name" placeholder="仅用于识别，如手机号或备注名" />
         </el-form-item>
 
         <!-- 139 特有字段 -->
@@ -113,7 +108,6 @@ const submitting = ref(false)
 const accountForm = ref({
   id: null,
   platform: '139',
-  account_name: '',
   cookie: '',
   auth_token: ''
 })
@@ -131,7 +125,7 @@ const fetchList = async () => {
 }
 
 const openAddDialog = () => {
-  accountForm.value = { id: null, platform: '139', account_name: '', cookie: '', auth_token: '' }
+  accountForm.value = { id: null, platform: '139', cookie: '', auth_token: '' }
   dialogVisible.value = true
 }
 
@@ -139,7 +133,6 @@ const handleEdit = (row) => {
   accountForm.value = {
     id: row.id,
     platform: row.platform,
-    account_name: row.account_name,
     cookie: row.cookie,
     auth_token: row.auth_token
   }
@@ -147,8 +140,6 @@ const handleEdit = (row) => {
 }
 
 const submitForm = async () => {
-  if (!accountForm.value.account_name) return ElMessage.warning('请输入账号备注')
-  
   submitting.value = true
   try {
     if (accountForm.value.id) {

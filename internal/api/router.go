@@ -71,6 +71,7 @@ func checkAccount(c *gin.Context) {
 	// 更新数据库中的信息
 	db.DB.Model(&account).Updates(map[string]interface{}{
 		"nickname":       updatedAccount.Nickname,
+		"account_name":   updatedAccount.AccountName,
 		"status":         1,
 		"capacity_used":  updatedAccount.CapacityUsed,
 		"capacity_total": updatedAccount.CapacityTotal,
