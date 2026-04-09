@@ -23,8 +23,10 @@ service.interceptors.response.use(
     return res
   },
   error => {
+    // 优先从后端返回的 JSON 结构中提取 error 字段
+    const msg = error.response?.data?.error || error.message || '请求失败'
     ElMessage({
-      message: error.message || '请求失败',
+      message: msg,
       type: 'error',
       duration: 5 * 1000
     })
