@@ -117,8 +117,9 @@ func (q *Quark) GetInfo(ctx context.Context) (*db.Account, error) {
 	}
 
 	var res struct {
-		Code int `json:"code"`
-		Data struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+		Data    *struct {
 			Nickname string `json:"nickname"`
 		} `json:"data"`
 	}
@@ -126,12 +127,52 @@ func (q *Quark) GetInfo(ctx context.Context) (*db.Account, error) {
 		return nil, err
 	}
 	if res.Code != 0 {
-		return nil, fmt.Errorf("Quark API error: %d", res.Code)
+		return nil, fmt.Errorf("Quark API error: %d, %s", res.Code, res.Message)
 	}
 
-	q.account.Nickname = res.Data.Nickname
+	nickname := ""
+	if res.Data != nil {
+		nickname = res.Data.Nickname
+	}
+	if nickname == "" {
+		nickname = q.account.AccountName
+	}
+	if nickname == "" {
+		nickname = "Quark User"
+	}
+
+	q.account.Nickname = nickname
 	q.account.Status = 1
 	q.account.LastCheck = time.Now()
+
+	// 2. 获取容量和 VIP 信息
+	queryGrowth := url.Values{}
+	growthResp, err := q.doRequest(ctx, "GET", BaseURLApp+"/1/clouddrive/capacity/growth/info", queryGrowth, nil, true)
+	if err == nil {
+		var growthRes struct {
+			Data struct {
+				MemberType    string `json:"member_type"`
+				TotalCapacity int64  `json:"total_capacity"`
+				UsedCapacity  int64  `json:"used_capacity"`
+			} `json:"data"`
+		}
+		if json.Unmarshal(growthResp, &growthRes) == nil {
+			q.account.CapacityTotal = growthRes.Data.TotalCapacity
+			q.account.CapacityUsed = growthRes.Data.UsedCapacity
+			vipMap := map[string]string{
+				"NORMAL":    "普通用户",
+				"EXP_SVIP":  "88VIP",
+				"SUPER_VIP": "SVIP",
+				"Z_VIP":     "SVIP+",
+			}
+			if name, ok := vipMap[growthRes.Data.MemberType]; ok {
+				q.account.VipName = name
+			} else {
+				q.account.VipName = growthRes.Data.MemberType
+			}
+		}
+	}
+
 	return q.account, nil
 }
 

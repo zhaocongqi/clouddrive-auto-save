@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -169,18 +170,81 @@ func (c *Cloud139) GetInfo(ctx context.Context) (*db.Account, error) {
 		Data struct {
 			UserDomainID string `json:"userDomainId"`
 			Nickname     string `json:"userName"`
+			LoginName    string `json:"loginName"`
+			Account      string `json:"account"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(resp, &res); err != nil {
 		return nil, err
 	}
-	if res.Code != "0000" {
+	if res.Code != "0000" && res.Code != "0" {
 		return nil, fmt.Errorf("API error: %s", res.Code)
 	}
 
-	c.account.Nickname = res.Data.Nickname
+	nickname := res.Data.Nickname
+	if nickname == "" {
+		nickname = res.Data.LoginName
+	}
+	if nickname == "" {
+		nickname = res.Data.Account
+	}
+	if nickname == "" {
+		nickname = c.account.AccountName
+	}
+	if nickname == "" {
+		nickname = "139 User"
+	}
+
+	c.account.Nickname = nickname
 	c.account.Status = 1
 	c.account.LastCheck = time.Now()
+
+	// 2. 获取磁盘容量信息
+	diskReq := map[string]interface{}{"userDomainId": res.Data.UserDomainID}
+	diskResp, err := c.doRequest(ctx, "POST", UserNjsURL+"/user/disk/getPersonalDiskInfo", diskReq, headers)
+	if err == nil {
+		var diskRes struct {
+			Data struct {
+				DiskSize     string `json:"diskSize"`
+				FreeDiskSize string `json:"freeDiskSize"`
+			} `json:"data"`
+		}
+		if json.Unmarshal(diskResp, &diskRes) == nil {
+			total, _ := strconv.ParseInt(diskRes.Data.DiskSize, 10, 64)
+			free, _ := strconv.ParseInt(diskRes.Data.FreeDiskSize, 10, 64)
+			c.account.CapacityTotal = total * 1024 * 1024 // MB to B
+			c.account.CapacityUsed = (total - free) * 1024 * 1024
+		}
+	}
+
+	// 3. 获取会员等级
+	benefitReq := map[string]interface{}{
+		"isNeedBenefit": 1,
+		"commonAccountInfo": map[string]interface{}{
+			"account":     c.account.AccountName,
+			"accountType": 1,
+		},
+	}
+	benefitResp, err := c.doRequest(ctx, "POST", BaseURL+"/orchestration/group-rebuild/member/v1.0/queryUserBenefits", benefitReq, headers)
+	if err == nil {
+		var benefitRes struct {
+			Data struct {
+				UserSubMemberList []struct {
+					MemberLevel int `json:"memberLevel"`
+				} `json:"userSubMemberList"`
+			} `json:"data"`
+		}
+		if json.Unmarshal(benefitResp, &benefitRes) == nil && len(benefitRes.Data.UserSubMemberList) > 0 {
+			level := benefitRes.Data.UserSubMemberList[0].MemberLevel
+			levels := map[int]string{0: "普通用户", 1: "白银会员", 2: "黄金会员", 3: "钻石会员"}
+			if name, ok := levels[level]; ok {
+				c.account.VipName = name
+			} else {
+				c.account.VipName = fmt.Sprintf("会员L%d", level)
+			}
+		}
+	}
+
 	return c.account, nil
 }
 
