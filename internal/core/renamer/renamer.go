@@ -2,7 +2,6 @@ package renamer
 
 import (
 	"bytes"
-	"fmt"
 	"regexp"
 	"strings"
 	"text/template"
@@ -10,11 +9,12 @@ import (
 )
 
 // MagicVariables 预定义的魔法正则变量
+// 注意：Go 的 regexp 不支持 Lookaround (断言)，需使用 \b
 var MagicVariables = map[string]string{
-	"{YEAR}":  `(?<!\d)(18|19|20)\d{2}(?!\d)`,
-	"{DATE}":  `(18|19|20)?\d{2}[\.\-/年]\d{1,2}[\.\-/月]\d{1,2}`,
+	"{YEAR}":    `\b(?:18|19|20)\d{2}\b`,
+	"{DATE}":    `\b(?:18|19|20)?\d{2}[\.\-/年]\d{1,2}[\.\-/月]\d{1,2}\b`,
 	"{CHINESE}": `[\u4e00-\u9fa5]{2,}`,
-	"{EXT}":   `(?<=\.)\w+$`,
+	"{EXT}":     `\.\w+$`,
 }
 
 // RenameOptions 重命名选项
