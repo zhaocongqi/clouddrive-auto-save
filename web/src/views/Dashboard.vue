@@ -13,7 +13,7 @@
           </div>
           <div class="stat-info">
             <div class="stat-label">运行中任务</div>
-            <div class="stat-value">12</div>
+            <div class="stat-value">{{ stats.running_tasks }}</div>
           </div>
         </el-card>
       </el-col>
@@ -25,7 +25,7 @@
           </div>
           <div class="stat-info">
             <div class="stat-label">已保存容量</div>
-            <div class="stat-value">1.2 TB</div>
+            <div class="stat-value">{{ formatSize(stats.capacity_used) }}</div>
           </div>
         </el-card>
       </el-col>
@@ -37,7 +37,7 @@
           </div>
           <div class="stat-info">
             <div class="stat-label">今日完成</div>
-            <div class="stat-value">48</div>
+            <div class="stat-value">{{ stats.today_completed }}</div>
           </div>
         </el-card>
       </el-col>
@@ -49,7 +49,7 @@
           </div>
           <div class="stat-info">
             <div class="stat-label">活跃账号</div>
-            <div class="stat-value">5</div>
+            <div class="stat-value">{{ stats.active_accounts }}</div>
           </div>
         </el-card>
       </el-col>
@@ -80,14 +80,16 @@
             <span>实时动态</span>
           </template>
           <el-timeline>
-            <el-timeline-item timestamp="刚刚" type="primary">
-              夸克任务 [黑镜] 转存成功
+            <el-timeline-item 
+              v-for="activity in stats.recent_activities" 
+              :key="activity.id"
+              :timestamp="formatRelativeTime(activity.last_run)" 
+              :type="getStatusType(activity.status)"
+            >
+              {{ activity.name }} {{ getStatusText(activity.status) }}
             </el-timeline-item>
-            <el-timeline-item timestamp="10分钟前">
-              移动云盘账号 Token 已自动刷新
-            </el-timeline-item>
-            <el-timeline-item timestamp="1小时前" type="success">
-              系统完成全量任务巡检
+            <el-timeline-item v-if="!stats.recent_activities?.length" timestamp="暂无">
+              暂无执行动态
             </el-timeline-item>
           </el-timeline>
         </el-card>
@@ -97,12 +99,73 @@
 </template>
 
 <script setup>
+import { onMounted, reactive } from 'vue'
 import { 
   Activity, 
   HardDrive, 
   RefreshCw, 
   User 
 } from 'lucide-vue-next'
+import { getStats } from '../api/dashboard'
+
+const stats = reactive({
+  running_tasks: 0,
+  capacity_used: 0,
+  today_completed: 0,
+  active_accounts: 0,
+  recent_activities: []
+})
+
+const fetchStats = async () => {
+  try {
+    const data = await getStats()
+    Object.assign(stats, data)
+  } catch (error) {
+    console.error('获取统计数据失败:', error)
+  }
+}
+
+onMounted(() => {
+  fetchStats()
+})
+
+const formatSize = (bytes) => {
+  if (bytes === 0) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return (bytes / Math.pow(k, i)).toFixed(2) + ' ' + sizes[i]
+}
+
+const formatRelativeTime = (timeStr) => {
+  if (!timeStr || timeStr.startsWith('0001')) return '从未执行'
+  const date = new Date(timeStr)
+  const now = new Date()
+  const diff = Math.floor((now - date) / 1000)
+
+  if (diff < 60) return '刚刚'
+  if (diff < 3600) return `${Math.floor(diff / 60)}分钟前`
+  if (diff < 86400) return `${Math.floor(diff / 3600)}小时前`
+  return `${Math.floor(diff / 86400)}天前`
+}
+
+const getStatusType = (status) => {
+  const types = {
+    'success': 'success',
+    'failed': 'danger',
+    'running': 'primary'
+  }
+  return types[status] || 'info'
+}
+
+const getStatusText = (status) => {
+  const texts = {
+    'success': '转存成功',
+    'failed': '转存失败',
+    'running': '正在执行'
+  }
+  return texts[status] || '已准备'
+}
 </script>
 
 <style scoped>
