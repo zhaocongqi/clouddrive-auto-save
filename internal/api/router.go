@@ -33,6 +33,8 @@ func InitRouter(wm *worker.Manager) *gin.Engine {
 		api.PUT("/tasks/:id", updateTask)
 		api.DELETE("/tasks/:id", deleteTask)
 		api.POST("/tasks/:id/run", runTask)
+
+		api.GET("/dashboard/stats", getDashboardStats)
 	}
 
 	// 静态资源处理
@@ -176,3 +178,30 @@ func runTask(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "task submitted to worker pool"})
 }
+
+func getDashboardStats(c *gin.Context) {
+	var runningTasks int64
+	db.DB.Model(&db.Task{}).Where("status = ?", "running").Count(&runningTasks)
+
+	var capacityUsed int64
+	db.DB.Model(&db.Account{}).Where("status = 1").Select("SUM(capacity_used)").Scan(&capacityUsed)
+
+	var todayCompleted int64
+	// SQLite date 函数
+	db.DB.Model(&db.Task{}).Where("status = ? AND DATE(last_run) = DATE('now', 'localtime')", "success").Count(&todayCompleted)
+
+	var activeAccounts int64
+	db.DB.Model(&db.Account{}).Where("status = 1").Count(&activeAccounts)
+
+	var recentTasks []db.Task
+	db.DB.Order("last_run desc").Limit(5).Find(&recentTasks)
+
+	c.JSON(http.StatusOK, gin.H{
+		"running_tasks":   runningTasks,
+		"capacity_used":   capacityUsed,
+		"today_completed": todayCompleted,
+		"active_accounts": activeAccounts,
+		"recent_activities": recentTasks,
+	})
+}
+
