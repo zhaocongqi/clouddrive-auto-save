@@ -2,17 +2,20 @@ package core
 
 import (
 	"context"
+	"time"
 	"github.com/zcq/clouddrive-auto-save/internal/db"
 )
 
 // FileInfo 代表云盘中的文件或文件夹信息
 type FileInfo struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	ParentID  string `json:"parent_id"`
-	IsFolder  bool   `json:"is_folder"`
-	Size      int64  `json:"size"`
-	UpdatedAt string `json:"updated_at"`
+	ID         string    `json:"id"`
+	Name       string    `json:"name"`
+	Path       string    `json:"path"` // 全路径，用于部分 API
+	ParentID   string    `json:"parent_id"`
+	IsFolder   bool      `json:"is_folder"`
+	Size       int64     `json:"size"`
+	UpdatedAt  string    `json:"updated_at"`
+	UpdateTime time.Time `json:"-"` // 解析后的标准时间
 }
 
 // CloudDrive 定义了所有云盘必须实现的标准接口
@@ -23,12 +26,16 @@ type CloudDrive interface {
 	
 	// 文件操作
 	ListFiles(ctx context.Context, parentID string) ([]FileInfo, error)
-	CreateFolder(ctx context.Context, name, parentID string) (string, error)
+	CreateFolder(ctx context.Context, parentID, name string) (*FileInfo, error)
 	DeleteFile(ctx context.Context, fileID string) error
 	
 	// 分享转存相关
-	// SaveLink 将分享链接中的文件转存到指定目标目录
-	SaveLink(ctx context.Context, shareURL, extractCode, targetPath string) error
+	// ParseShare 解析分享链接，返回其中的文件列表
+	ParseShare(ctx context.Context, shareURL, extractCode string) ([]FileInfo, error)
+	// SaveFileTo 将特定的分享文件保存到目标路径
+	SaveFileTo(ctx context.Context, fileID, targetPath string) error
+	// SaveLink 将分享链接中的文件转存到指定目标目录。如果 fileIDs 不为空，则仅转存指定的文件。
+	SaveLink(ctx context.Context, shareURL, extractCode, targetPath string, fileIDs []string) error
 }
 
 // DriveFactory 用于根据平台创建对应的驱动实例
