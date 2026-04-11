@@ -11,6 +11,7 @@ import (
 	"math/rand"
 	"net/http"
 	"net/url"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -54,14 +55,57 @@ func md5Hash(str string) string {
 	return fmt.Sprintf("%x", h.Sum(nil))
 }
 
+// jsEncodeURIComponent 模拟 JS 的 encodeURIComponent，确保空格转为 %20 而非 +
+func jsEncodeURIComponent(str string) string {
+	t := url.QueryEscape(str)
+	t = strings.ReplaceAll(t, "+", "%20")
+	t = strings.ReplaceAll(t, "%21", "!")
+	t = strings.ReplaceAll(t, "%27", "'")
+	t = strings.ReplaceAll(t, "%28", "(")
+	t = strings.ReplaceAll(t, "%29", ")")
+	t = strings.ReplaceAll(t, "%2A", "*")
+	t = strings.ReplaceAll(t, "%7E", "~")
+	return t
+}
+
+func (c *Cloud139) getPhone() string {
+	re := regexp.MustCompile(`1\d{10}`) // 匹配 11 位手机号
+
+	// 1. 如果 AccountName 本身就是 11 位手机号，直接返回
+	if re.MatchString(c.account.AccountName) {
+		return re.FindString(c.account.AccountName)
+	}
+
+	// 2. 尝试从 AuthToken 中提取
+	auth := c.account.AuthToken
+	if auth != "" {
+		token := auth
+		if strings.HasPrefix(strings.ToLower(auth), "basic ") {
+			token = auth[6:]
+		}
+		decoded, err := base64.StdEncoding.DecodeString(token)
+		if err == nil {
+			if match := re.FindString(string(decoded)); match != "" {
+				return match
+			}
+		}
+	}
+
+	// 3. 尝试从 Cookie 中提取（通常 Cookie 中会包含手机号）
+	if c.account.Cookie != "" {
+		if match := re.FindString(c.account.Cookie); match != "" {
+			return match
+		}
+	}
+
+	return ""
+}
+
 func getNewSignHash(body interface{}, datetime, randomStr string) string {
 	s := ""
 	if body != nil {
 		jsonBytes, _ := json.Marshal(body)
-		s = string(jsonBytes)
-		s = url.QueryEscape(s)
-		// 139 的 QueryEscape 与 JS 的 encodeURIComponent 有细微差别（空格变+等），
-		// 但核心逻辑是字符排序后的 MD5。
+		s = jsEncodeURIComponent(string(jsonBytes))
 		chars := strings.Split(s, "")
 		sort.Strings(chars)
 		s = strings.Join(chars, "")
@@ -81,15 +125,15 @@ func (c *Cloud139) computeMcloudSign(catalogID string) string {
 	}
 
 	getDiskBody := map[string]interface{}{
-		"catalogID":     catalogID,
-		"sortDirection": 1,
-		"startNumber":   1,
-		"endNumber":     100,
-		"filterType":    0,
+		"catalogID":       catalogID,
+		"sortDirection":   1,
+		"startNumber":     1,
+		"endNumber":       100,
+		"filterType":      0,
 		"catalogSortType": 0,
 		"contentSortType": 0,
 		"commonAccountInfo": map[string]interface{}{
-			"account":     c.account.AccountName,
+			"account":     c.getPhone(),
 			"accountType": 1,
 		},
 	}
@@ -111,13 +155,7 @@ func (c *Cloud139) doRequest(ctx context.Context, method, apiURL string, body in
 		return nil, err
 	}
 
-	// 默认 Headers
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-	req.Header.Set("Referer", "https://yun.139.com/")
-	req.Header.Set("Origin", "https://yun.139.com")
-
-	// 身份认证
+	// 1. 设置身份认证
 	if c.account.AuthToken != "" {
 		auth := c.account.AuthToken
 		if !strings.HasPrefix(strings.ToLower(auth), "basic ") {
@@ -128,7 +166,40 @@ func (c *Cloud139) doRequest(ctx context.Context, method, apiURL string, body in
 		req.Header.Set("Cookie", c.account.Cookie)
 	}
 
-	// 额外 Headers
+	// 2. 设置通用 Web 模拟 Headers
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36")
+	req.Header.Set("Referer", "https://yun.139.com/")
+	req.Header.Set("Origin", "https://yun.139.com")
+	req.Header.Set("x-yun-api-version", "v1")
+	req.Header.Set("x-yun-app-channel", "10000034")
+	req.Header.Set("x-yun-channel-source", "10000034")
+	req.Header.Set("x-yun-client-info", "||9|7.17.2|chrome|143.0.0.0|ff559f01db65afce55f3b4e5d75be4cb||windows 10||zh-CN|||")
+	req.Header.Set("x-yun-module-type", "100")
+	req.Header.Set("x-yun-svc-type", "1")
+	req.Header.Set("mcloud-channel", "1000101")
+	req.Header.Set("mcloud-version", "7.17.2")
+	req.Header.Set("mcloud-client", "10701")
+	req.Header.Set("mcloud-route", "001")
+
+	// 3. 针对不同域名的特殊处理
+	if strings.Contains(apiURL, "personal-kd-njs") {
+		req.Header.Set("INNER-HCY-ROUTER-HTTPS", "1")
+		req.Header.Set("x-m4c-caller", "PC")
+		req.Header.Set("x-m4c-src", "10002")
+		req.Header.Set("x-inner-ntwk", "2")
+		req.Header.Set("X-Deviceinfo", "||9|7.17.2|chrome|143.0.0.0|ff559f01db65afce55f3b4e5d75be4cb||windows 10||zh-CN|||")
+		req.Header.Set("CMS-DEVICE", "default")
+		req.Header.Set("x-huawei-channelSrc", "10000034")
+		req.Header.Set("x-SvcType", "1")
+	} else if strings.Contains(apiURL, "share-kd-njs") {
+		req.Header.Set("caller", "web")
+		req.Header.Set("x-m4c-caller", "PC")
+		// 分享接口不需要 mcloud-sign，如果有则移除
+		delete(headers, "mcloud-sign")
+	}
+
+	// 4. 覆盖/添加传入的自定义 Headers
 	for k, v := range headers {
 		req.Header.Set(k, v)
 	}
@@ -209,6 +280,21 @@ func (c *Cloud139) GetInfo(ctx context.Context) (*db.Account, error) {
 	if phone == "" {
 		phone, _ = data["account"].(string)
 	}
+	if phone == "" {
+		phone, _ = data["msisdn"].(string)
+	}
+	if profile, ok := data["userProfileInfo"].(map[string]interface{}); ok {
+		if phone == "" {
+			phone, _ = profile["msisdn"].(string)
+		}
+		if phone == "" {
+			phone, _ = profile["loginAccount"].(string)
+		}
+		if phone == "" {
+			phone, _ = profile["account"].(string)
+		}
+	}
+
 	userDomainID, _ := data["userDomainId"].(string)
 
 	if nickname == "" {
@@ -225,13 +311,15 @@ func (c *Cloud139) GetInfo(ctx context.Context) (*db.Account, error) {
 	c.account.Status = 1
 	c.account.LastCheck = time.Now()
 	
-	// 自动填充账号名（如果数据库里是空的）
-	if c.account.AccountName == "" {
-		if phone != "" {
-			c.account.AccountName = phone
-		} else {
-			c.account.AccountName = nickname
-		}
+	// 关键修复：从获取到的任何包含手机号的字符串中精准提取 11 位数字
+	rePhone := regexp.MustCompile(`1\d{10}`)
+	if rePhone.MatchString(phone) {
+		c.account.AccountName = rePhone.FindString(phone)
+	} else if c.account.Cookie != "" && rePhone.MatchString(c.account.Cookie) {
+		// 最后的尝试：从 Cookie 字符串中提取
+		c.account.AccountName = rePhone.FindString(c.account.Cookie)
+	} else if c.account.AccountName == "" {
+		c.account.AccountName = nickname
 	}
 
 	// 尝试从 auth 节点获取会员等级
@@ -413,9 +501,7 @@ func (c *Cloud139) CreateFolder(ctx context.Context, parentID, name string) (*co
 	}
 	sign := c.computeMcloudSign(parentID)
 	headers := map[string]string{
-		"mcloud-sign":            sign,
-		"mcloud-version":         "7.17.2",
-		"INNER-HCY-ROUTER-HTTPS": "1",
+		"mcloud-sign": sign,
 	}
 	body := map[string]interface{}{
 		"parentFileId": parentID,
@@ -427,18 +513,31 @@ func (c *Cloud139) CreateFolder(ctx context.Context, parentID, name string) (*co
 		return nil, err
 	}
 	var res struct {
-		Code string `json:"code"`
-		Data struct {
-			FileID string `json:"fileId"`
+		Code    string `json:"code"`
+		Success bool   `json:"success"`
+		Message string `json:"message"`
+		Data    struct {
+			FileID   string `json:"fileId"`
+			ID       string `json:"id"`
+			FileName string `json:"fileName"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(resp, &res); err != nil {
 		return nil, err
 	}
+	if !res.Success && res.Code != "0" && res.Code != "0000" && res.Code != "" {
+		return nil, fmt.Errorf("139 CreateFolder error [%s]: %s", res.Code, res.Message)
+	}
+
+	finalID := res.Data.FileID
+	if finalID == "" {
+		finalID = res.Data.ID
+	}
+
 	return &core.FileInfo{
-		ID:       res.Data.FileID,
+		ID:       finalID,
 		Name:     name,
-		Path:     res.Data.FileID,
+		Path:     finalID,
 		IsFolder: true,
 	}, nil
 }
@@ -457,15 +556,28 @@ func (c *Cloud139) ParseShare(ctx context.Context, shareURL, extractCode string)
 		return nil, err
 	}
 
+	cst := time.FixedZone("CST", 8*3600)
+
 	var files []core.FileInfo
 	// 139 分享信息中 caLst 是文件夹，coLst 是文件
 	if caLst, ok := info["caLst"].([]interface{}); ok {
 		for _, item := range caLst {
 			if f, ok := item.(map[string]interface{}); ok {
 				updateAt, _ := f["updateTime"].(string)
-				updateTime, _ := time.Parse("2006-01-02 15:04:05", updateAt)
+				updateTime, _ := time.ParseInLocation("2006-01-02 15:04:05", updateAt, cst)
+				
+				// 优先使用官方返回的 path 字段，格式通常为 parentID/caID
+				path, _ := f["path"].(string)
+				if path == "" {
+					caID := f["catalogID"]
+					if caID == nil {
+						caID = f["caID"]
+					}
+					path = fmt.Sprintf("%v/%v", f["parentCatalogID"], caID)
+				}
+
 				files = append(files, core.FileInfo{
-					ID:         fmt.Sprintf("%v/%v", f["parentCatalogID"], f["catalogID"]),
+					ID:         path,
 					Name:       fmt.Sprintf("%v", f["catalogName"]),
 					IsFolder:   true,
 					UpdatedAt:  updateAt,
@@ -478,10 +590,17 @@ func (c *Cloud139) ParseShare(ctx context.Context, shareURL, extractCode string)
 		for _, item := range coLst {
 			if f, ok := item.(map[string]interface{}); ok {
 				updateAt, _ := f["updateTime"].(string)
-				updateTime, _ := time.Parse("2006-01-02 15:04:05", updateAt)
+				updateTime, _ := time.ParseInLocation("2006-01-02 15:04:05", updateAt, cst)
 				size, _ := f["contentSize"].(float64)
+
+				// 优先使用官方返回的 path 字段，格式通常为 parentID/coID
+				path, _ := f["path"].(string)
+				if path == "" {
+					path = fmt.Sprintf("%v/%v", f["parentCatalogID"], f["contentID"])
+				}
+
 				files = append(files, core.FileInfo{
-					ID:         fmt.Sprintf("%v/%v", f["parentCatalogID"], f["contentID"]),
+					ID:         path,
 					Name:       fmt.Sprintf("%v", f["contentName"]),
 					IsFolder:   false,
 					Size:       int64(size),
@@ -510,6 +629,11 @@ func (c *Cloud139) SaveFileTo(ctx context.Context, fileID, targetPath string) er
 }
 
 func (c *Cloud139) SaveLink(ctx context.Context, shareURL, extractCode, targetPath string, fileIDs []string) error {
+	phone := c.getPhone()
+	if phone == "" {
+		return fmt.Errorf("139 SaveLink error: 无法获取合法的 11 位手机号，请先在账号管理中校验账号")
+	}
+
 	linkID, passwd, err := c.parseShareLink(shareURL)
 	if err != nil {
 		return err
@@ -528,30 +652,45 @@ func (c *Cloud139) SaveLink(ctx context.Context, shareURL, extractCode, targetPa
 		return err
 	}
 
+	// 139 Orchestration API 根目录 ID 必须为 root
+	if targetID == "/" || targetID == "" {
+		targetID = "root"
+	}
+
 	idMap := make(map[string]bool)
 	for _, id := range fileIDs {
 		idMap[id] = true
 	}
 
-	var coPathLst []string
+	coPathLst := []string{}
 	if coLst, ok := info["coLst"].([]interface{}); ok {
 		for _, item := range coLst {
 			if f, ok := item.(map[string]interface{}); ok {
-				fullID := fmt.Sprintf("%v/%v", f["parentCatalogID"], f["contentID"])
-				if len(fileIDs) == 0 || idMap[fullID] {
-					coPathLst = append(coPathLst, fullID)
+				path, _ := f["path"].(string)
+				if path == "" {
+					path = fmt.Sprintf("%v/%v", f["parentCatalogID"], f["contentID"])
+				}
+				if len(fileIDs) == 0 || idMap[path] {
+					coPathLst = append(coPathLst, path)
 				}
 			}
 		}
 	}
-	
-	var caPathLst []string
+
+	caPathLst := []string{}
 	if caLst, ok := info["caLst"].([]interface{}); ok {
 		for _, item := range caLst {
 			if f, ok := item.(map[string]interface{}); ok {
-				fullID := fmt.Sprintf("%v/%v", f["parentCatalogID"], f["catalogID"])
-				if len(fileIDs) == 0 || idMap[fullID] {
-					caPathLst = append(caPathLst, fullID)
+				path, _ := f["path"].(string)
+				if path == "" {
+					caID := f["catalogID"]
+					if caID == nil {
+						caID = f["caID"]
+					}
+					path = fmt.Sprintf("%v/%v", f["parentCatalogID"], caID)
+				}
+				if len(fileIDs) == 0 || idMap[path] {
+					caPathLst = append(caPathLst, path)
 				}
 			}
 		}
@@ -563,28 +702,38 @@ func (c *Cloud139) SaveLink(ctx context.Context, shareURL, extractCode, targetPa
 
 	saveBody := map[string]interface{}{
 		"createOuterLinkBatchOprTaskReq": map[string]interface{}{
-			"msisdn":       c.account.AccountName,
+			"msisdn":       phone,
 			"ownerAccount": "",
 			"taskType":     1,
 			"linkID":       linkID,
 			"needPassword": passwd != "",
 			"taskInfo": map[string]interface{}{
-				"linkID":            linkID,
-				"needPassword":      passwd != "",
-				"contentInfoList":   coPathLst,
-				"catalogInfoList":   caPathLst,
-				"newCatalogID":      targetID,
+				"linkID":          linkID,
+				"needPassword":    passwd != "",
+				"contentInfoList": coPathLst,
+				"catalogInfoList": caPathLst,
+				"newCatalogID":    targetID,
 			},
 		},
 	}
 
-	headers := map[string]string{
-		"caller":         "web",
-		"x-m4c-caller":   "PC",
-		"mcloud-client":  "10701",
+	resp, err := c.doRequest(ctx, "POST", ShareKdNjsURL+"/yun-share/richlifeApp/devapp/IBatchOprTask/createOuterLinkBatchOprTask", saveBody, nil)
+	if err != nil {
+		return err
 	}
-	_, err = c.doRequest(ctx, "POST", ShareKdNjsURL+"/yun-share/richlifeApp/devapp/IBatchOprTask/createOuterLinkBatchOprTask", saveBody, headers)
-	return err
+
+	var saveRes struct {
+		Code interface{} `json:"code"`
+		Desc string      `json:"desc"`
+	}
+	if err := json.Unmarshal(resp, &saveRes); err == nil {
+		codeStr := fmt.Sprintf("%v", saveRes.Code)
+		if codeStr != "0" && codeStr != "0000" && codeStr != "" {
+			return fmt.Errorf("139 SaveLink error [%s]: %s", codeStr, saveRes.Desc)
+		}
+	}
+
+	return nil
 }
 
 func (c *Cloud139) DeleteFile(ctx context.Context, fileID string) error {
@@ -601,19 +750,89 @@ func (c *Cloud139) DeleteFile(ctx context.Context, fileID string) error {
 }
 
 func (c *Cloud139) parseShareLink(input string) (string, string, error) {
-	u, err := url.Parse(input)
-	if err != nil {
-		return input, "", nil
+	trimmed := strings.TrimSpace(input)
+	if trimmed == "" {
+		return "", "", fmt.Errorf("empty share link")
 	}
+
+	// 1. 尝试作为纯 linkID 处理 (无 "/" 且长度在 4-32 之间)
+	reBare := regexp.MustCompile(`^[a-zA-Z0-9_-]{4,32}$`)
+	if reBare.MatchString(trimmed) && !strings.Contains(trimmed, "/") {
+		return trimmed, "", nil
+	}
+
+	// 2. 补全协议并解析 URL
+	urlStr := trimmed
+	if !strings.HasPrefix(strings.ToLower(urlStr), "http") {
+		urlStr = "https://" + urlStr
+	}
+	u, err := url.Parse(urlStr)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to parse url: %v", err)
+	}
+
+	// 3. 提取常规 Query 参数
 	linkID := u.Query().Get("linkID")
 	if linkID == "" {
-		parts := strings.Split(u.Path, "/")
-		linkID = parts[len(parts)-1]
+		linkID = u.Query().Get("linkId")
 	}
+
+	// 4. 处理 caiyun.139.com/m/i?{linkID} 格式 (linkID 作为 key)
+	if linkID == "" && u.RawQuery != "" && !strings.Contains(u.RawQuery, "=") {
+		if reBare.MatchString(u.RawQuery) {
+			linkID = u.RawQuery
+		}
+	}
+
+	// 5. 处理 Hash 路径格式: #/w/i/{linkID}
+	if linkID == "" && u.Fragment != "" {
+		// 尝试 Fragment 中的 query
+		if strings.Contains(u.Fragment, "?") {
+			parts := strings.Split(u.Fragment, "?")
+			if len(parts) > 1 {
+				fQuery, _ := url.ParseQuery(parts[1])
+				linkID = fQuery.Get("linkID")
+				if linkID == "" {
+					linkID = fQuery.Get("linkId")
+				}
+			}
+		}
+		// 尝试 Fragment 路径末段
+		if linkID == "" {
+			fPath := u.Fragment
+			if strings.Contains(fPath, "?") {
+				fPath = strings.Split(fPath, "?")[0]
+			}
+			parts := strings.Split(strings.Trim(fPath, "/"), "/")
+			if len(parts) > 0 {
+				candidate := parts[len(parts)-1]
+				if reBare.MatchString(candidate) {
+					linkID = candidate
+				}
+			}
+		}
+	}
+
+	// 6. 兜底处理 Path 末段
+	if linkID == "" {
+		parts := strings.Split(strings.Trim(u.Path, "/"), "/")
+		if len(parts) > 0 {
+			candidate := parts[len(parts)-1]
+			if reBare.MatchString(candidate) {
+				linkID = candidate
+			}
+		}
+	}
+
+	if linkID == "" {
+		return "", "", fmt.Errorf("linkID not found in: %s", input)
+	}
+
 	passwd := u.Query().Get("passwd")
 	if passwd == "" {
 		passwd = u.Query().Get("pwd")
 	}
+
 	return linkID, passwd, nil
 }
 
@@ -623,10 +842,11 @@ func (c *Cloud139) getShareInfo(ctx context.Context, linkID, passwd, pCaID strin
 		"x-m4c-caller":   "PC",
 		"mcloud-client":  "10701",
 		"mcloud-version": "7.17.2",
+		"mcloud-channel": "1000101",
 	}
 	body := map[string]interface{}{
 		"getOutLinkInfoReq": map[string]interface{}{
-			"account": c.account.AccountName,
+			"account": c.getPhone(),
 			"linkID":  linkID,
 			"passwd":  passwd,
 			"pCaID":   pCaID,
@@ -641,22 +861,33 @@ func (c *Cloud139) getShareInfo(ctx context.Context, linkID, passwd, pCaID strin
 	if err != nil {
 		return nil, err
 	}
-	var res struct {
-		Code string                 `json:"code"`
-		Data map[string]interface{} `json:"data"`
-	}
+
+	var res map[string]interface{}
 	if err := json.Unmarshal(resp, &res); err != nil {
 		return nil, err
 	}
-	return res.Data, nil
+
+	// 检查 code 状态
+	if code, ok := res["code"]; ok {
+		codeStr := fmt.Sprintf("%v", code)
+		if codeStr != "0" && codeStr != "0000" && codeStr != "" {
+			return nil, fmt.Errorf("139 getShareInfo error [%s]: %v", codeStr, res["message"])
+		}
+	}
+
+	// 优先返回 data 字段，否则返回整个 map
+	if data, ok := res["data"].(map[string]interface{}); ok {
+		return data, nil
+	}
+	return res, nil
 }
 
 func (c *Cloud139) prepareTargetPath(ctx context.Context, path string) (string, error) {
 	if path == "" || path == "/" {
-		return "/", nil
+		return "root", nil
 	}
 	parts := strings.Split(strings.Trim(path, "/"), "/")
-	currentID := "/"
+	currentID := "root"
 	for _, part := range parts {
 		files, err := c.ListFiles(ctx, currentID)
 		if err != nil {
