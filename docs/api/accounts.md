@@ -54,8 +54,36 @@
 
 ---
 
-## 5. 删除账号
-彻底移除该账号信息。
+## 6. 获取网盘目录树
+获取指定账号下特定目录的子文件夹列表（支持懒加载）。
 
-- **URL**: `/accounts/:id`
-- **Method**: `DELETE`
+- **URL**: `/accounts/:id/folders`
+- **Method**: `GET`
+- **Params**:
+    - `parent_id`: 父目录 ID（夸克为 FID，139 为路径或 ID）。默认为空（根目录）。
+    - `parent_path`: 父目录的绝对路径。用于构造返回项的完整路径。
+- **Response**: `Array<FolderItem>`
+
+### FolderItem 对象结构
+| 字段 | 类型 | 说明 |
+| :--- | :--- | :--- |
+| `id` | string | 文件夹唯一标识 (FID) |
+| `path` | string | 文件夹的绝对路径 |
+| `label` | string | 文件夹显示名称 |
+| `isLeaf` | bool | 是否为叶子节点（目前统一返回 false 以支持展开） |
+
+---
+
+## 7. 新建网盘文件夹
+在指定账号的特定目录下创建一个新文件夹。
+
+- **URL**: `/accounts/:id/folders`
+- **Method**: `POST`
+- **Payload**:
+| 字段 | 类型 | 必填 | 说明 |
+| :--- | :--- | :--- | :--- |
+| `parent_id` | string | 否 | 父目录 ID |
+| `parent_path`| string | 是 | 父目录绝对路径 |
+| `name` | string | 是 | 新文件夹名称 |
+
+- **Response**: 返回新建成功的 `FolderItem` 对象。
