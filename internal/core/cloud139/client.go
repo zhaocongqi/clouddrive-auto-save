@@ -393,25 +393,28 @@ func (c *Cloud139) ListFiles(ctx context.Context, parentID string) ([]core.FileI
 	var files []core.FileInfo
 	for _, item := range res.Data.Items {
 		isFolder := item.Type == "folder" || item.Category == "folder"
+		updateTime, _ := time.Parse("2006-01-02 15:04:05", item.UpdateAt)
 		files = append(files, core.FileInfo{
-			ID:        item.FileID,
-			Name:      item.Name,
-			IsFolder:  isFolder,
-			Size:      item.Size,
-			UpdatedAt: item.UpdateAt,
+			ID:         item.FileID,
+			Name:       item.Name,
+			Path:       item.FileID, // 139 ID 即可代表 Path
+			IsFolder:   isFolder,
+			Size:       item.Size,
+			UpdatedAt:  item.UpdateAt,
+			UpdateTime: updateTime,
 		})
 	}
 	return files, nil
 }
 
-func (c *Cloud139) CreateFolder(ctx context.Context, name, parentID string) (string, error) {
+func (c *Cloud139) CreateFolder(ctx context.Context, parentID, name string) (*core.FileInfo, error) {
 	if parentID == "" {
 		parentID = "/"
 	}
 	sign := c.computeMcloudSign(parentID)
 	headers := map[string]string{
-		"mcloud-sign": sign,
-		"mcloud-version": "7.17.2",
+		"mcloud-sign":            sign,
+		"mcloud-version":         "7.17.2",
 		"INNER-HCY-ROUTER-HTTPS": "1",
 	}
 	body := map[string]interface{}{
@@ -421,7 +424,7 @@ func (c *Cloud139) CreateFolder(ctx context.Context, name, parentID string) (str
 	}
 	resp, err := c.doRequest(ctx, "POST", PersonalKdNjsURL+"/hcy/file/create", body, headers)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	var res struct {
 		Code string `json:"code"`
@@ -430,15 +433,164 @@ func (c *Cloud139) CreateFolder(ctx context.Context, name, parentID string) (str
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(resp, &res); err != nil {
-		return "", err
+		return nil, err
 	}
-	return res.Data.FileID, nil
+	return &core.FileInfo{
+		ID:       res.Data.FileID,
+		Name:     name,
+		Path:     res.Data.FileID,
+		IsFolder: true,
+	}, nil
+}
+
+func (c *Cloud139) ParseShare(ctx context.Context, shareURL, extractCode string) ([]core.FileInfo, error) {
+	linkID, passwd, err := c.parseShareLink(shareURL)
+	if err != nil {
+		return nil, err
+	}
+	if extractCode != "" {
+		passwd = extractCode
+	}
+
+	info, err := c.getShareInfo(ctx, linkID, passwd, "root")
+	if err != nil {
+		return nil, err
+	}
+
+	var files []core.FileInfo
+	// 139 分享信息中 caLst 是文件夹，coLst 是文件
+	if caLst, ok := info["caLst"].([]interface{}); ok {
+		for _, item := range caLst {
+			if f, ok := item.(map[string]interface{}); ok {
+				updateAt, _ := f["updateTime"].(string)
+				updateTime, _ := time.Parse("2006-01-02 15:04:05", updateAt)
+				files = append(files, core.FileInfo{
+					ID:         fmt.Sprintf("%v/%v", f["parentCatalogID"], f["catalogID"]),
+					Name:       fmt.Sprintf("%v", f["catalogName"]),
+					IsFolder:   true,
+					UpdatedAt:  updateAt,
+					UpdateTime: updateTime,
+				})
+			}
+		}
+	}
+	if coLst, ok := info["coLst"].([]interface{}); ok {
+		for _, item := range coLst {
+			if f, ok := item.(map[string]interface{}); ok {
+				updateAt, _ := f["updateTime"].(string)
+				updateTime, _ := time.Parse("2006-01-02 15:04:05", updateAt)
+				size, _ := f["contentSize"].(float64)
+				files = append(files, core.FileInfo{
+					ID:         fmt.Sprintf("%v/%v", f["parentCatalogID"], f["contentID"]),
+					Name:       fmt.Sprintf("%v", f["contentName"]),
+					IsFolder:   false,
+					Size:       int64(size),
+					UpdatedAt:  updateAt,
+					UpdateTime: updateTime,
+				})
+			}
+		}
+	}
+	return files, nil
+}
+
+func (c *Cloud139) SaveFileTo(ctx context.Context, fileID, targetPath string) error {
+	// 139 的 fileID 在分享场景下是 "parentID/fileID" 格式
+	parts := strings.Split(fileID, "/")
+	if len(parts) < 2 {
+		return fmt.Errorf("invalid fileID format for 139 share: %s", fileID)
+	}
+
+	// 提前解析出 linkID 和 passwd (由于 SaveFileTo 接口没传 shareURL，
+	// 139 的这个接口设计可能需要驱动内部状态或者在调用处做特殊处理。
+	// 这里为了符合接口，我们假设 fileID 中已经隐含了上下文，
+	// 或者在实际 Worker 中，如果是 139，我们会调用 SaveLink 这种批量接口。)
+	// 考虑到 139 的特殊性，我们在 SaveLink 中实现具体逻辑。
+	return fmt.Errorf("139 driver prefers batch SaveLink operation")
+}
+
+func (c *Cloud139) SaveLink(ctx context.Context, shareURL, extractCode, targetPath string, fileIDs []string) error {
+	linkID, passwd, err := c.parseShareLink(shareURL)
+	if err != nil {
+		return err
+	}
+	if extractCode != "" {
+		passwd = extractCode
+	}
+
+	info, err := c.getShareInfo(ctx, linkID, passwd, "root")
+	if err != nil {
+		return err
+	}
+
+	targetID, err := c.prepareTargetPath(ctx, targetPath)
+	if err != nil {
+		return err
+	}
+
+	idMap := make(map[string]bool)
+	for _, id := range fileIDs {
+		idMap[id] = true
+	}
+
+	var coPathLst []string
+	if coLst, ok := info["coLst"].([]interface{}); ok {
+		for _, item := range coLst {
+			if f, ok := item.(map[string]interface{}); ok {
+				fullID := fmt.Sprintf("%v/%v", f["parentCatalogID"], f["contentID"])
+				if len(fileIDs) == 0 || idMap[fullID] {
+					coPathLst = append(coPathLst, fullID)
+				}
+			}
+		}
+	}
+	
+	var caPathLst []string
+	if caLst, ok := info["caLst"].([]interface{}); ok {
+		for _, item := range caLst {
+			if f, ok := item.(map[string]interface{}); ok {
+				fullID := fmt.Sprintf("%v/%v", f["parentCatalogID"], f["catalogID"])
+				if len(fileIDs) == 0 || idMap[fullID] {
+					caPathLst = append(caPathLst, fullID)
+				}
+			}
+		}
+	}
+
+	if len(coPathLst) == 0 && len(caPathLst) == 0 {
+		return nil
+	}
+
+	saveBody := map[string]interface{}{
+		"createOuterLinkBatchOprTaskReq": map[string]interface{}{
+			"msisdn":       c.account.AccountName,
+			"ownerAccount": "",
+			"taskType":     1,
+			"linkID":       linkID,
+			"needPassword": passwd != "",
+			"taskInfo": map[string]interface{}{
+				"linkID":            linkID,
+				"needPassword":      passwd != "",
+				"contentInfoList":   coPathLst,
+				"catalogInfoList":   caPathLst,
+				"newCatalogID":      targetID,
+			},
+		},
+	}
+
+	headers := map[string]string{
+		"caller":         "web",
+		"x-m4c-caller":   "PC",
+		"mcloud-client":  "10701",
+	}
+	_, err = c.doRequest(ctx, "POST", ShareKdNjsURL+"/yun-share/richlifeApp/devapp/IBatchOprTask/createOuterLinkBatchOprTask", saveBody, headers)
+	return err
 }
 
 func (c *Cloud139) DeleteFile(ctx context.Context, fileID string) error {
 	sign := c.computeMcloudSign("/")
 	headers := map[string]string{
-		"mcloud-sign": sign,
+		"mcloud-sign":            sign,
 		"INNER-HCY-ROUTER-HTTPS": "1",
 	}
 	body := map[string]interface{}{
@@ -448,17 +600,13 @@ func (c *Cloud139) DeleteFile(ctx context.Context, fileID string) error {
 	return err
 }
 
-// ─── 分享转存相关 ─────────────────────────────────────────────────────────────
-
 func (c *Cloud139) parseShareLink(input string) (string, string, error) {
 	u, err := url.Parse(input)
 	if err != nil {
-		// 尝试直接作为 linkID 处理
 		return input, "", nil
 	}
 	linkID := u.Query().Get("linkID")
 	if linkID == "" {
-		// 尝试从路径或 Hash 中提取，这里简化处理，实际可能需要更复杂的正则表达式
 		parts := strings.Split(u.Path, "/")
 		linkID = parts[len(parts)-1]
 	}
@@ -503,77 +651,6 @@ func (c *Cloud139) getShareInfo(ctx context.Context, linkID, passwd, pCaID strin
 	return res.Data, nil
 }
 
-func (c *Cloud139) SaveLink(ctx context.Context, shareURL, extractCode, targetPath string) error {
-	linkID, passwd, err := c.parseShareLink(shareURL)
-	if err != nil {
-		return err
-	}
-	if extractCode != "" {
-		passwd = extractCode
-	}
-
-	// 1. 获取分享内容 (根目录)
-	info, err := c.getShareInfo(ctx, linkID, passwd, "root")
-	if err != nil {
-		return err
-	}
-
-	// 2. 获取目标目录 ID (逐级查找或创建)
-	targetID, err := c.prepareTargetPath(ctx, targetPath)
-	if err != nil {
-		return err
-	}
-
-	// 3. 构建转存请求
-	// 注意：139 转存需要 path 列表，格式为 "parentID/fileID"
-	var coPathLst []string
-	if coLst, ok := info["coLst"].([]interface{}); ok {
-		for _, item := range coLst {
-			if f, ok := item.(map[string]interface{}); ok {
-				coPathLst = append(coPathLst, fmt.Sprintf("%v/%v", f["parentCatalogID"], f["contentID"]))
-			}
-		}
-	}
-	
-	var caPathLst []string
-	if caLst, ok := info["caLst"].([]interface{}); ok {
-		for _, item := range caLst {
-			if f, ok := item.(map[string]interface{}); ok {
-				caPathLst = append(caPathLst, fmt.Sprintf("%v/%v", f["parentCatalogID"], f["catalogID"]))
-			}
-		}
-	}
-
-	if len(coPathLst) == 0 && len(caPathLst) == 0 {
-		return nil // 无内容可存
-	}
-
-	saveBody := map[string]interface{}{
-		"createOuterLinkBatchOprTaskReq": map[string]interface{}{
-			"msisdn":       c.account.AccountName,
-			"ownerAccount": "",
-			"taskType":     1,
-			"linkID":       linkID,
-			"needPassword": passwd != "",
-			"taskInfo": map[string]interface{}{
-				"linkID":            linkID,
-				"needPassword":      passwd != "",
-				"contentInfoList":   coPathLst,
-				"catalogInfoList":   caPathLst,
-				"newCatalogID":      targetID,
-			},
-		},
-	}
-
-	headers := map[string]string{
-		"caller":         "web",
-		"x-m4c-caller":   "PC",
-		"mcloud-client":  "10701",
-	}
-	_, err = c.doRequest(ctx, "POST", ShareKdNjsURL+"/yun-share/richlifeApp/devapp/IBatchOprTask/createOuterLinkBatchOprTask", saveBody, headers)
-	return err
-}
-
 func (c *Cloud139) prepareTargetPath(ctx context.Context, path string) (string, error) {
 	if path == "" || path == "/" {
 		return "/", nil
@@ -594,11 +671,11 @@ func (c *Cloud139) prepareTargetPath(ctx context.Context, path string) (string, 
 			}
 		}
 		if !found {
-			newID, err := c.CreateFolder(ctx, part, currentID)
+			newFolder, err := c.CreateFolder(ctx, currentID, part)
 			if err != nil {
 				return "", err
 			}
-			currentID = newID
+			currentID = newFolder.ID
 		}
 	}
 	return currentID, nil

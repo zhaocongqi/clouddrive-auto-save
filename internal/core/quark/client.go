@@ -65,20 +65,57 @@ func (q *Quark) parseMparam(cookie string) map[string]string {
 
 func (q *Quark) doRequest(ctx context.Context, method, apiURL string, query url.Values, body io.Reader, useAppParams bool) ([]byte, error) {
 	fullURL := apiURL
+	headers := http.Header{}
+	headers.Set("Content-Type", "application/json")
+	headers.Set("User-Agent", UserAgent)
+	headers.Set("Referer", "https://pan.quark.cn/")
+
 	if useAppParams && q.mparam["kps"] != "" {
 		fullURL = strings.Replace(apiURL, BaseURL, BaseURLApp, 1)
 		if query == nil {
 			query = make(url.Values)
 		}
-		query.Set("pr", "ucpro")
+		query.Set("device_model", "M2011K2C")
+		query.Set("entry", "default_clouddrive")
+		query.Set("_t_group", "0%3A_s_vp%3A1")
+		query.Set("dmn", "Mi%2B11")
 		query.Set("fr", "android")
+		query.Set("pf", "3300")
+		query.Set("bi", "35937")
+		query.Set("ve", "7.4.5.680")
+		query.Set("ss", "411x875")
+		query.Set("mi", "M2011K2C")
+		query.Set("nt", "5")
+		query.Set("nw", "0")
+		query.Set("kt", "4")
+		query.Set("pr", "ucpro")
+		query.Set("sv", "release")
+		query.Set("dt", "phone")
+		query.Set("data_from", "ucapi")
 		query.Set("kps", q.mparam["kps"])
 		query.Set("sign", q.mparam["sign"])
 		query.Set("vcode", q.mparam["vcode"])
+		query.Set("app", "clouddrive")
+		query.Set("kkkk", "1")
+	} else {
+		headers.Set("Cookie", q.account.Cookie)
+		if query == nil {
+			query = make(url.Values)
+		}
+		if query.Get("pr") == "" {
+			query.Set("pr", "ucpro")
+		}
+		if query.Get("fr") == "" {
+			query.Set("fr", "pc")
+		}
 	}
 
 	if len(query) > 0 {
-		fullURL += "?" + query.Encode()
+		if strings.Contains(fullURL, "?") {
+			fullURL += "&" + query.Encode()
+		} else {
+			fullURL += "?" + query.Encode()
+		}
 	}
 
 	req, err := http.NewRequestWithContext(ctx, method, fullURL, body)
@@ -86,10 +123,7 @@ func (q *Quark) doRequest(ctx context.Context, method, apiURL string, query url.
 		return nil, err
 	}
 
-	req.Header.Set("Cookie", q.account.Cookie)
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("User-Agent", UserAgent)
-	req.Header.Set("Referer", "https://pan.quark.cn/")
+	req.Header = headers
 
 	resp, err := q.client.Do(req)
 	if err != nil {
@@ -100,6 +134,10 @@ func (q *Quark) doRequest(ctx context.Context, method, apiURL string, query url.
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("Quark API HTTP error: %d, body: %s", resp.StatusCode, string(respBody))
 	}
 
 	return respBody, nil
@@ -313,8 +351,72 @@ func (q *Quark) ListFiles(ctx context.Context, parentID string) ([]core.FileInfo
 	query.Set("_page", "1")
 	query.Set("_size", "100")
 	query.Set("_sort", "file_type:asc,updated_at:desc")
+	query.Set("_fetch_total", "1")
+	query.Set("fetch_risk_file_name", "1")
+	query.Set("pr", "ucpro")
+	query.Set("fr", "pc")
 
 	resp, err := q.doRequest(ctx, "GET", apiURL, query, nil, false)
+	if err != nil {
+		return nil, err
+	}
+
+	// DEBUG: 打印原始响应
+	// fmt.Printf("DEBUG: Quark ListFiles raw: %s\n", string(resp))
+
+	var res struct {
+		Code interface{} `json:"code"`
+		Data struct {
+			List []map[string]interface{} `json:"list"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(resp, &res); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal quark response: %v", err)
+	}
+
+	codeStr := fmt.Sprintf("%v", res.Code)
+	if codeStr != "0" && codeStr != "0.0" {
+		return nil, fmt.Errorf("Quark API error: %v", res.Code)
+	}
+
+	var files []core.FileInfo
+	for _, item := range res.Data.List {
+		fid, _ := item["fid"].(string)
+		fileName, _ := item["file_name"].(string)
+		dir, _ := item["dir"].(bool)
+		sizeVal, _ := item["size"].(float64)
+		updateAtVal, _ := item["updated_at"].(float64)
+		
+		updateTime := time.Unix(int64(updateAtVal)/1000, 0)
+		files = append(files, core.FileInfo{
+			ID:         fid,
+			Name:       fileName,
+			Path:       fid,
+			IsFolder:   dir,
+			Size:       int64(sizeVal),
+			UpdatedAt:  updateTime.Format("2006-01-02 15:04:05"),
+			UpdateTime: updateTime,
+		})
+	}
+	return files, nil
+}
+
+func (q *Quark) CreateFolder(ctx context.Context, parentID, name string) (*core.FileInfo, error) {
+	if parentID == "" || parentID == "/" {
+		parentID = "0"
+	}
+	apiURL := BaseURL + "/1/clouddrive/file"
+	query := url.Values{}
+	query.Set("pr", "ucpro")
+	query.Set("fr", "pc")
+	
+	body := map[string]interface{}{
+		"pdir_fid":  parentID,
+		"file_name": name,
+		"dir_path":  "",
+	}
+	jsonBody, _ := json.Marshal(body)
+	resp, err := q.doRequest(ctx, "POST", apiURL, query, strings.NewReader(string(jsonBody)), false)
 	if err != nil {
 		return nil, err
 	}
@@ -322,13 +424,7 @@ func (q *Quark) ListFiles(ctx context.Context, parentID string) ([]core.FileInfo
 	var res struct {
 		Code interface{} `json:"code"`
 		Data struct {
-			List []struct {
-				Fid      string `json:"fid"`
-				FileName string `json:"file_name"`
-				Dir      bool   `json:"dir"`
-				Size     int64  `json:"size"`
-				UpdateAt int64  `json:"updated_at"`
-			} `json:"list"`
+			Fid string `json:"fid"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(resp, &res); err != nil {
@@ -339,51 +435,12 @@ func (q *Quark) ListFiles(ctx context.Context, parentID string) ([]core.FileInfo
 	if codeStr != "0" && codeStr != "0.0" {
 		return nil, fmt.Errorf("Quark API error: %v", res.Code)
 	}
-
-	var files []core.FileInfo
-	for _, item := range res.Data.List {
-		files = append(files, core.FileInfo{
-			ID:        item.Fid,
-			Name:      item.FileName,
-			IsFolder:  item.Dir,
-			Size:      item.Size,
-			UpdatedAt: time.Unix(item.UpdateAt/1000, 0).Format("2006-01-02 15:04:05"),
-		})
-	}
-	return files, nil
-}
-
-func (q *Quark) CreateFolder(ctx context.Context, name, parentID string) (string, error) {
-	if parentID == "" || parentID == "/" {
-		parentID = "0"
-	}
-	apiURL := BaseURL + "/1/clouddrive/file"
-	body := map[string]interface{}{
-		"pdir_fid":  parentID,
-		"file_name": name,
-		"dir_path":  "",
-	}
-	jsonBody, _ := json.Marshal(body)
-	resp, err := q.doRequest(ctx, "POST", apiURL, nil, strings.NewReader(string(jsonBody)), false)
-	if err != nil {
-		return "", err
-	}
-
-	var res struct {
-		Code interface{} `json:"code"`
-		Data struct {
-			Fid string `json:"fid"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal(resp, &res); err != nil {
-		return "", err
-	}
-
-	codeStr := fmt.Sprintf("%v", res.Code)
-	if codeStr != "0" && codeStr != "0.0" {
-		return "", fmt.Errorf("Quark API error: %v", res.Code)
-	}
-	return res.Data.Fid, nil
+	return &core.FileInfo{
+		ID:       res.Data.Fid,
+		Name:     name,
+		Path:     res.Data.Fid,
+		IsFolder: true,
+	}, nil
 }
 
 func (q *Quark) DeleteFile(ctx context.Context, fileID string) error {
@@ -398,25 +455,16 @@ func (q *Quark) DeleteFile(ctx context.Context, fileID string) error {
 	return err
 }
 
-func (q *Quark) SaveLink(ctx context.Context, shareURL, extractCode, targetPath string) error {
-	// 1. 提取 pwd_id
-	reID := regexp.MustCompile(`/s/(\w+)`)
-	match := reID.FindStringSubmatch(shareURL)
-	if len(match) < 2 {
-		return fmt.Errorf("invalid quark share url")
-	}
-	pwdID := match[1]
-
-	// 2. 获取 stoken
+func (q *Quark) getStoken(ctx context.Context, pwdID, extractCode string) (string, error) {
 	tokenURL := BaseURL + "/1/clouddrive/share/sharepage/token"
 	tokenBody := map[string]interface{}{
 		"pwd_id":   pwdID,
 		"passcode": extractCode,
 	}
 	jsonToken, _ := json.Marshal(tokenBody)
-	resp, err := q.doRequest(ctx, "POST", tokenURL, nil, strings.NewReader(string(jsonToken)), false)
+	resp, err := q.doRequest(ctx, "POST", tokenURL, nil, strings.NewReader(string(jsonToken)), true)
 	if err != nil {
-		return err
+		return "", err
 	}
 	var tokenRes struct {
 		Code interface{} `json:"code"`
@@ -425,22 +473,110 @@ func (q *Quark) SaveLink(ctx context.Context, shareURL, extractCode, targetPath 
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(resp, &tokenRes); err != nil {
-		return err
+		return "", err
 	}
-
 	codeStr := fmt.Sprintf("%v", tokenRes.Code)
 	if codeStr != "0" && codeStr != "0.0" {
-		return fmt.Errorf("Quark token error: %v", tokenRes.Code)
+		return "", fmt.Errorf("Quark token error: %v", tokenRes.Code)
 	}
-	stoken := tokenRes.Data.Stoken
+	return tokenRes.Data.Stoken, nil
+}
 
-	// 3. 获取详情
+func (q *Quark) ParseShare(ctx context.Context, shareURL, extractCode string) ([]core.FileInfo, error) {
+	reID := regexp.MustCompile(`/s/(\w+)`)
+	match := reID.FindStringSubmatch(shareURL)
+	if len(match) < 2 {
+		return nil, fmt.Errorf("invalid quark share url")
+	}
+	pwdID := match[1]
+
+	stoken, err := q.getStoken(ctx, pwdID, extractCode)
+	if err != nil {
+		return nil, err
+	}
+
 	detailURL := BaseURL + "/1/clouddrive/share/sharepage/detail"
 	detailQuery := url.Values{}
 	detailQuery.Set("pwd_id", pwdID)
 	detailQuery.Set("stoken", stoken)
 	detailQuery.Set("pdir_fid", "0")
-	resp, err = q.doRequest(ctx, "GET", detailURL, detailQuery, nil, false)
+	detailQuery.Set("pr", "ucpro")
+	detailQuery.Set("fr", "pc")
+	detailQuery.Set("force", "0")
+	detailQuery.Set("_page", "1")
+	detailQuery.Set("_size", "100")
+	detailQuery.Set("_fetch_total", "1")
+	detailQuery.Set("_sort", "file_type:asc,updated_at:desc")
+	resp, err := q.doRequest(ctx, "GET", detailURL, detailQuery, nil, true)
+	if err != nil {
+		return nil, err
+	}
+	var detailRes struct {
+		Data struct {
+			List []struct {
+				Fid           string `json:"fid"`
+				FileName      string `json:"file_name"`
+				Dir           bool   `json:"dir"`
+				Size          int64  `json:"size"`
+				UpdateAt      int64  `json:"updated_at"`
+				ShareFidToken string `json:"share_fid_token"`
+			} `json:"list"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(resp, &detailRes); err != nil {
+		return nil, err
+	}
+
+	var files []core.FileInfo
+	for _, item := range detailRes.Data.List {
+		updateTime := time.Unix(item.UpdateAt/1000, 0)
+		files = append(files, core.FileInfo{
+			ID:         fmt.Sprintf("%s|%s|%s", item.Fid, item.ShareFidToken, stoken), // 组合 ID 供 SaveFileTo 使用
+			Name:       item.FileName,
+			IsFolder:   item.Dir,
+			Size:       item.Size,
+			UpdatedAt:  updateTime.Format("2006-01-02 15:04:05"),
+			UpdateTime: updateTime,
+		})
+	}
+	return files, nil
+}
+
+func (q *Quark) SaveFileTo(ctx context.Context, fileID, targetPath string) error {
+	_ = ctx
+	_ = fileID
+	_ = targetPath
+	// 夸克传过来的预览 ID 格式是 "fid|token|stoken"
+	// ... 在实际 Worker 中，如果是 Quark，由于 API 限制，建议仍使用 SaveLink 进行批量保存
+	return fmt.Errorf("quark driver prefers batch SaveLink operation")
+}
+
+func (q *Quark) SaveLink(ctx context.Context, shareURL, extractCode, targetPath string, fileIDs []string) error {
+	reID := regexp.MustCompile(`/s/(\w+)`)
+	match := reID.FindStringSubmatch(shareURL)
+	if len(match) < 2 {
+		return fmt.Errorf("invalid quark share url")
+	}
+	pwdID := match[1]
+
+	stoken, err := q.getStoken(ctx, pwdID, extractCode)
+	if err != nil {
+		return err
+	}
+
+	detailURL := BaseURL + "/1/clouddrive/share/sharepage/detail"
+	detailQuery := url.Values{}
+	detailQuery.Set("pwd_id", pwdID)
+	detailQuery.Set("stoken", stoken)
+	detailQuery.Set("pdir_fid", "0")
+	detailQuery.Set("pr", "ucpro")
+	detailQuery.Set("fr", "pc")
+	detailQuery.Set("force", "0")
+	detailQuery.Set("_page", "1")
+	detailQuery.Set("_size", "100")
+	detailQuery.Set("_fetch_total", "1")
+	detailQuery.Set("_sort", "file_type:asc,updated_at:desc")
+	resp, err := q.doRequest(ctx, "GET", detailURL, detailQuery, nil, true)
 	if err != nil {
 		return err
 	}
@@ -454,21 +590,37 @@ func (q *Quark) SaveLink(ctx context.Context, shareURL, extractCode, targetPath 
 	}
 	json.Unmarshal(resp, &detailRes)
 
-	// 4. 准备目标目录
 	targetID, err := q.prepareTargetPath(ctx, targetPath)
 	if err != nil {
 		return err
 	}
 
-	// 5. 执行转存
+	idMap := make(map[string]bool)
+	for _, id := range fileIDs {
+		// 夸克传过来的预览 ID 格式是 "fid|token|stoken"
+		parts := strings.Split(id, "|")
+		idMap[parts[0]] = true
+	}
+
 	var fids []string
 	var tokens []string
 	for _, item := range detailRes.Data.List {
-		fids = append(fids, item.Fid)
-		tokens = append(tokens, item.ShareFidToken)
+		if len(fileIDs) == 0 || idMap[item.Fid] {
+			fids = append(fids, item.Fid)
+			tokens = append(tokens, item.ShareFidToken)
+		}
+	}
+
+	if len(fids) == 0 {
+		return nil
 	}
 
 	saveURL := BaseURL + "/1/clouddrive/share/sharepage/save"
+	saveQuery := url.Values{}
+	saveQuery.Set("__t", strconv.FormatInt(time.Now().UnixMilli(), 10))
+	saveQuery.Set("__dt", strconv.FormatInt(time.Now().UnixMilli()+123, 10))
+	saveQuery.Set("uc_param_str", "")
+
 	saveBody := map[string]interface{}{
 		"fid_list":       fids,
 		"fid_token_list": tokens,
@@ -479,7 +631,7 @@ func (q *Quark) SaveLink(ctx context.Context, shareURL, extractCode, targetPath 
 		"scene":          "link",
 	}
 	jsonSave, _ := json.Marshal(saveBody)
-	_, err = q.doRequest(ctx, "POST", saveURL, nil, strings.NewReader(string(jsonSave)), false)
+	_, err = q.doRequest(ctx, "POST", saveURL, saveQuery, strings.NewReader(string(jsonSave)), true)
 	return err
 }
 
@@ -503,11 +655,11 @@ func (q *Quark) prepareTargetPath(ctx context.Context, path string) (string, err
 			}
 		}
 		if !found {
-			newID, err := q.CreateFolder(ctx, part, currentID)
+			newFolder, err := q.CreateFolder(ctx, currentID, part)
 			if err != nil {
 				return "", err
 			}
-			currentID = newID
+			currentID = newFolder.ID
 		}
 	}
 	return currentID, nil
