@@ -91,13 +91,36 @@ func (m *Manager) execute(job Job) {
 	ctx, cancel := context.WithTimeout(m.ctx, 30*time.Minute)
 	defer cancel()
 
-	err := driver.SaveLink(ctx, task.ShareURL, task.ExtractCode, task.SavePath)
+	// 3.1 获取分享全量文件
+	files, err := driver.ParseShare(ctx, task.ShareURL, task.ExtractCode)
+	if err != nil {
+		m.finishTask(task, "failed", fmt.Sprintf("Failed to parse share: %v", err))
+		return
+	}
+
+	// 3.2 日期过滤
+	var filteredIDs []string
+	for _, f := range files {
+		// 如果设置了开始日期，且文件时间早于开始日期，则过滤掉
+		if task.StartDate != nil && !f.UpdateTime.IsZero() && f.UpdateTime.Before(*task.StartDate) {
+			continue
+		}
+		filteredIDs = append(filteredIDs, f.ID)
+	}
+
+	if len(filteredIDs) == 0 {
+		m.finishTask(task, "success", "No new files to transfer (all filtered by date)")
+		return
+	}
+
+	// 3.3 执行转存
+	err = driver.SaveLink(ctx, task.ShareURL, task.ExtractCode, task.SavePath, filteredIDs)
 	if err != nil {
 		m.finishTask(task, "failed", err.Error())
 		return
 	}
 
-	// 4. TODO: 执行重命名引擎逻辑
+	// 4. TODO: 执行重命名引擎逻辑 (后续实现)
 
 	m.finishTask(task, "success", "Transfer completed successfully")
 }
