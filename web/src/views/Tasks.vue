@@ -92,9 +92,10 @@
         <!-- 分享文件列表与起始点选择 -->
         <div v-if="shareFiles.length > 0 || parsingShare" class="share-files-section">
           <div class="section-title">
-            <span>选择起始转存文件 (可选)</span>
+            <span>选择起始转存点 (可选)</span>
             <el-icon v-if="parsingShare" class="is-loading"><RefreshCw /></el-icon>
           </div>
+          
           <el-table 
             :data="shareFiles" 
             max-height="250" 
@@ -109,11 +110,11 @@
                 <el-radio v-model="form.start_file_id" :label="row.id">&nbsp;</el-radio>
               </template>
             </el-table-column>
-            <el-table-column prop="name" label="文件名" show-overflow-tooltip />
-            <el-table-column prop="updated_at" label="更新时间" width="150" />
+            <el-table-column prop="name" label="从该文件开始 (含)" show-overflow-tooltip />
+            <el-table-column prop="updated_at" label="更新时间" width="150" sortable />
           </el-table>
           <div class="share-tips">
-            * 将从选中的文件开始（含）向前转存所有更新的文件。不选则转存全部。
+            * 逻辑：系统将从选中的文件开始，按更新时间向前转存所有更新的文件。
           </div>
         </div>
 
@@ -463,6 +464,11 @@ const handleEdit = (row) => {
     start_file_id: row.start_file_id
   }
   dialogVisible.value = true
+  
+  // 关键修复：编辑时如果链接存在，立即手动触发一次解析
+  if (form.value.share_url && form.value.account_id) {
+    handleAutoParseShare()
+  }
 }
 
 const submitForm = async () => {
@@ -603,6 +609,21 @@ html.dark .task-name-cell .name {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.filter-options {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background-color: var(--el-fill-color-lighter);
+  padding: 8px;
+  border-radius: 4px;
+}
+
+.filter-label {
+  font-size: 12px;
+  color: var(--el-text-color-regular);
+  white-space: nowrap;
 }
 
 .share-tips {
