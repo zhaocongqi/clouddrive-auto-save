@@ -5,10 +5,21 @@
         <h2>账号管理</h2>
         <p>管理您的移动云盘和夸克网盘账号</p>
       </div>
-      <el-button type="primary" :icon="Plus" @click="openAddDialog">添加账号</el-button>
+      <div class="header-actions">
+        <el-radio-group v-model="viewMode" size="default" class="view-toggle" @change="toggleViewMode">
+          <el-radio-button label="table">
+            <el-icon><List /></el-icon>
+          </el-radio-button>
+          <el-radio-button label="card">
+            <el-icon><LayoutGrid /></el-icon>
+          </el-radio-button>
+        </el-radio-group>
+        <el-button type="primary" :icon="Plus" @click="openAddDialog">添加账号</el-button>
+      </div>
     </div>
 
-    <el-card class="table-card">
+    <!-- 表格视图 -->
+    <el-card v-if="viewMode === 'table'" class="table-card">
       <el-table :data="accountList" v-loading="loading" style="width: 100%">
         <el-table-column label="平台" width="140">
           <template #default="{ row }">
@@ -71,6 +82,67 @@
       </el-table>
     </el-card>
 
+    <!-- 卡片视图 -->
+    <div v-else class="card-view-container" v-loading="loading">
+      <el-row :gutter="20">
+        <el-col v-for="row in accountList" :key="row.id" :xs="24" :sm="12" :md="8" :lg="6">
+          <el-card class="account-card" body-style="padding: 20px">
+            <div class="card-header">
+              <div class="card-title">
+                <el-icon :class="row.platform" class="platform-icon mini">
+                  <HardDrive />
+                </el-icon>
+                <div class="account-info">
+                  <div class="nickname">{{ row.nickname }}</div>
+                  <div class="platform-tag">{{ row.platform === 'quark' ? '夸克网盘' : '移动云盘' }}</div>
+                </div>
+              </div>
+              <el-tag :type="row.status === 1 ? 'success' : 'danger'" size="small" effect="light" round>
+                {{ row.status === 1 ? '正常' : '失效' }}
+              </el-tag>
+            </div>
+
+            <div class="card-content">
+              <div v-if="row.capacity_total > 0" class="capacity-section">
+                <div class="capacity-header">
+                  <span>{{ formatBytes(row.capacity_used) }} / {{ formatBytes(row.capacity_total) }}</span>
+                  <span class="remaining">剩 {{ formatBytes(row.capacity_total - row.capacity_used) }}</span>
+                </div>
+                <el-progress 
+                  :percentage="calcPercentage(row.capacity_used, row.capacity_total)" 
+                  :show-text="false"
+                  :stroke-width="8"
+                  :status="getCapacityStatus(row.capacity_used, row.capacity_total)"
+                  class="gradient-progress"
+                />
+              </div>
+              <div v-else class="empty-capacity">
+                <el-icon><Info /></el-icon> 未同步容量信息
+              </div>
+              
+              <div class="meta-info">
+                <div class="meta-item" v-if="row.vip_name">
+                  <span class="label">会员状态</span>
+                  <el-tag size="small" type="warning" effect="plain">{{ row.vip_name }}</el-tag>
+                </div>
+                <div class="meta-item">
+                  <span class="label">最后校验</span>
+                  <span class="value">{{ formatTime(row.last_check) }}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="card-footer">
+              <el-button type="primary" link :icon="RefreshCcw" @click="handleCheck(row)">校验</el-button>
+              <el-button type="primary" link :icon="Edit" @click="handleEdit(row)">编辑</el-button>
+              <el-button type="danger" link :icon="Trash2" @click="handleDelete(row)">删除</el-button>
+            </div>
+          </el-card>
+        </el-col>
+      </el-row>
+      <el-empty v-if="accountList.length === 0" description="暂无账号" />
+    </div>
+
     <!-- 添加账号对话框 -->
     <el-dialog v-model="dialogVisible" :title="accountForm.id ? '编辑账号' : '添加新账号'" width="520px" destroy-on-close>
       <el-form :model="accountForm" label-position="top" ref="formRef" class="account-form">
@@ -114,7 +186,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { Plus, RefreshCcw, Trash2, Edit, HardDrive, Info } from 'lucide-vue-next'
+import { Plus, RefreshCcw, Trash2, Edit, HardDrive, Info, LayoutGrid, List } from 'lucide-vue-next'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getAccounts, createAccount, updateAccount, deleteAccount, checkAccount } from '../api/account'
 
@@ -122,6 +194,12 @@ const accountList = ref([])
 const loading = ref(false)
 const dialogVisible = ref(false)
 const submitting = ref(false)
+const viewMode = ref(localStorage.getItem('accountViewMode') || 'table')
+
+const toggleViewMode = (mode) => {
+  viewMode.value = mode
+  localStorage.setItem('accountViewMode', mode)
+}
 
 const accountForm = ref({
   id: null,
@@ -248,6 +326,128 @@ html.dark .title-section h2 {
 .title-section p {
   color: #64748b;
   margin: 4px 0 0 0;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.view-toggle :deep(.el-radio-button__inner) {
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+}
+
+.account-card {
+  border-radius: 16px;
+  margin-bottom: 20px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid var(--el-border-color-lighter);
+}
+
+.account-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px -4px rgba(0, 0, 0, 0.1);
+  border-color: var(--el-color-primary-light-5);
+}
+
+.account-card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+}
+
+.card-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.platform-icon.mini {
+  padding: 8px;
+  font-size: 16px;
+}
+
+.account-info .nickname {
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--el-text-color-primary);
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-info .platform-tag {
+  font-size: 12px;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
+.capacity-section {
+  margin-bottom: 20px;
+}
+
+.capacity-section .capacity-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  margin-bottom: 8px;
+  color: #64748b;
+}
+
+.capacity-section .remaining {
+  color: #10b981;
+  font-weight: 600;
+}
+
+.empty-capacity {
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background-color: var(--el-fill-color-lighter);
+  border-radius: 8px;
+  color: #94a3b8;
+  font-size: 13px;
+  margin-bottom: 20px;
+}
+
+.meta-info {
+  background-color: var(--el-fill-color-blank);
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border: 1px dashed var(--el-border-color-lighter);
+}
+
+.meta-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+}
+
+.meta-item .label {
+  color: #94a3b8;
+}
+
+.meta-item .value {
+  color: var(--el-text-color-regular);
+}
+
+.card-footer {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--el-border-color-extra-light);
+  display: flex;
+  justify-content: space-around;
 }
 
 .table-card {
