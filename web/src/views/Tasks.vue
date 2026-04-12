@@ -82,22 +82,40 @@
         </el-form-item>
 
         <el-row :gutter="20">
-          <el-col :span="12">
+          <el-col :span="24">
             <el-form-item label="提取码">
               <el-input v-model="form.extract_code" placeholder="如果有提取码请填写" />
             </el-form-item>
           </el-col>
-          <el-col :span="12">
-            <el-form-item label="起始日期过滤" tooltip="仅转存此时间之后更新的文件">
-              <el-date-picker
-                v-model="form.start_date"
-                type="datetime"
-                placeholder="从哪个日期开始转存"
-                style="width: 100%"
-              />
-            </el-form-item>
-          </el-col>
         </el-row>
+
+        <!-- 分享文件列表与起始点选择 -->
+        <div v-if="shareFiles.length > 0 || parsingShare" class="share-files-section">
+          <div class="section-title">
+            <span>选择起始转存文件 (可选)</span>
+            <el-icon v-if="parsingShare" class="is-loading"><RefreshCw /></el-icon>
+          </div>
+          <el-table 
+            :data="shareFiles" 
+            max-height="250" 
+            size="small" 
+            border 
+            stripe 
+            v-loading="parsingShare"
+            highlight-current-row
+          >
+            <el-table-column width="50" align="center">
+              <template #default="{ row }">
+                <el-radio v-model="form.start_file_id" :label="row.id">&nbsp;</el-radio>
+              </template>
+            </el-table-column>
+            <el-table-column prop="name" label="文件名" show-overflow-tooltip />
+            <el-table-column prop="updated_at" label="更新时间" width="150" />
+          </el-table>
+          <div class="share-tips">
+            * 将从选中的文件开始（含）向前转存所有更新的文件。不选则转存全部。
+          </div>
+        </div>
 
         <el-form-item label="保存路径" required>
           <div class="path-input-group">
@@ -213,18 +231,19 @@
       </el-table>
       <div class="preview-tips">
         <p>* 列表基于当前分享链接的真实文件解析。</p>
-        <p>* 过滤规则：早于 <b>{{ formatTime(form.start_date) }}</b> 的文件将不执行转存。</p>
+        <p>* 过滤规则：如果设置了起始文件，则该文件之后（更旧）的文件将不执行转存。</p>
       </div>
     </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { Plus, Play, Edit, Trash2, RefreshCw } from 'lucide-vue-next'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getTasks, createTask, updateTask, deleteTask, runTask, previewTask } from '../api/task'
+import { getTasks, createTask, updateTask, deleteTask, runTask, previewTask, parseShareLink } from '../api/task'
 import { getAccounts, getFolders, createFolder } from '../api/account'
+import { debounce } from 'lodash-es'
 
 const taskList = ref([])
 const accounts = ref([])
@@ -239,6 +258,10 @@ const previewData = ref([])
 
 // 路径到 ID 的映射，用于辅助新建文件夹
 const pathIdMap = ref({ '/': '' })
+
+// 分享内容解析相关
+const shareFiles = ref([])
+const parsingShare = ref(false)
 
 // 独立目录弹窗相关
 const folderDialogVisible = ref(false)
@@ -265,8 +288,34 @@ const form = ref({
   save_path: '/',
   pattern: '',
   replacement: '',
-  start_date: null
+  start_file_id: ''
 })
+
+// 防抖解析分享链接
+const handleAutoParseShare = debounce(async () => {
+  if (!form.value.share_url || !form.value.account_id) {
+    shareFiles.value = []
+    return
+  }
+  
+  parsingShare.value = true
+  try {
+    const data = await parseShareLink({
+      account_id: form.value.account_id,
+      share_url: form.value.share_url,
+      extract_code: form.value.extract_code
+    })
+    shareFiles.value = data
+  } catch (err) {
+    console.error('解析链接失败:', err)
+    shareFiles.value = []
+  } finally {
+    parsingShare.value = false
+  }
+}, 800)
+
+// 监听变动
+watch(() => [form.value.share_url, form.value.account_id, form.value.extract_code], handleAutoParseShare)
 
 let pollTimer = null
 
@@ -396,7 +445,8 @@ const confirmFolderSelection = () => {
 }
 
 const openAddDialog = () => {
-  form.value = { id: null, name: '', account_id: '', share_url: '', extract_code: '', save_path: '/', pattern: '', replacement: '', start_date: null }
+  form.value = { id: null, name: '', account_id: '', share_url: '', extract_code: '', save_path: '/', pattern: '', replacement: '', start_file_id: '' }
+  shareFiles.value = []
   dialogVisible.value = true
 }
 
@@ -410,7 +460,7 @@ const handleEdit = (row) => {
     save_path: row.save_path,
     pattern: row.pattern,
     replacement: row.replacement,
-    start_date: row.start_date
+    start_file_id: row.start_file_id
   }
   dialogVisible.value = true
 }
@@ -535,6 +585,30 @@ html.dark .task-name-cell .name {
   display: flex;
   gap: 12px;
   align-items: center;
+}
+
+.share-files-section {
+  margin-bottom: 20px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 8px;
+  padding: 12px;
+  background-color: var(--el-fill-color-blank);
+}
+
+.share-files-section .section-title {
+  font-size: 13px;
+  font-weight: bold;
+  margin-bottom: 10px;
+  color: var(--el-text-color-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.share-tips {
+  font-size: 12px;
+  color: #94a3b8;
+  margin-top: 8px;
 }
 
 .save-path-input {

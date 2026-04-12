@@ -44,3 +44,11 @@ export function previewTask(data) {
     data
   })
 }
+
+export function parseShareLink(data) {
+  return request({
+    url: '/tasks/parse_share',
+    method: 'post',
+    data
+  })
+}
