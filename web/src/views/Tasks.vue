@@ -169,7 +169,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { Plus, Play, Edit, Trash2, RefreshCw } from 'lucide-vue-next'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getTasks, createTask, updateTask, deleteTask, runTask, previewTask } from '../api/task'
@@ -201,8 +201,10 @@ const form = ref({
   start_date: null
 })
 
-const fetchList = async () => {
-  loading.value = true
+let pollTimer = null
+
+const fetchList = async (silent = false) => {
+  if (!silent) loading.value = true
   try {
     const [taskData, accountData] = await Promise.all([getTasks(), getAccounts()])
     taskList.value = taskData
@@ -210,7 +212,7 @@ const fetchList = async () => {
   } catch (err) {
     console.error(err)
   } finally {
-    loading.value = false
+    if (!silent) loading.value = false
   }
 }
 
@@ -367,7 +369,16 @@ const formatTime = (timeStr) => {
   return new Date(timeStr).toLocaleString()
 }
 
-onMounted(fetchList)
+onMounted(() => {
+  fetchList()
+  pollTimer = setInterval(() => {
+    fetchList(true)
+  }, 5000)
+})
+
+onUnmounted(() => {
+  if (pollTimer) clearInterval(pollTimer)
+})
 </script>
 
 <style scoped>
