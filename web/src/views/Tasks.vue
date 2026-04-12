@@ -101,17 +101,18 @@
 
         <el-form-item label="保存路径" required>
           <div class="path-input-group">
-            <el-tree-select
-              :key="form.account_id"
-              v-model="form.save_path"
-              lazy
-              :load="loadFolders"
-              :props="{ label: 'label', value: 'path', isLeaf: 'isLeaf' }"
-              placeholder="请选择网盘内的保存目录"
-              check-strictly
-              style="flex: 1"
-            />
-            <el-button type="primary" link :icon="Plus" @click="handleCreateFolder">新建</el-button>
+            <el-input 
+              v-model="form.save_path" 
+              placeholder="可手动输入或点击右侧选择" 
+              class="save-path-input"
+            >
+              <template #prepend v-if="selectedAccountPlatform">
+                [{{ selectedAccountPlatform }}]
+              </template>
+              <template #append>
+                <el-button @click="openFolderDialog">选择目录</el-button>
+              </template>
+            </el-input>
           </div>
         </el-form-item>
 
@@ -138,6 +139,56 @@
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
         <el-button type="primary" :loading="submitting" @click="submitForm">确认并保存</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 目录选择独立弹窗 -->
+    <el-dialog 
+      v-model="folderDialogVisible" 
+      title="选择保存目录" 
+      width="600px" 
+      class="folder-dialog"
+      append-to-body
+      destroy-on-close
+    >
+      <div class="folder-tree-container">
+        <el-tree
+          ref="folderTreeRef"
+          lazy
+          :load="loadFolders"
+          :props="{ label: 'label', isLeaf: 'isLeaf' }"
+          node-key="path"
+          highlight-current
+          @current-change="handleTreeCurrentChange"
+          :expand-on-click-node="false"
+        >
+          <template #default="{ node, data }">
+            <span class="custom-tree-node">
+              <span>{{ node.label }}</span>
+            </span>
+          </template>
+        </el-tree>
+      </div>
+      
+      <template #footer>
+        <div class="folder-dialog-footer">
+          <div class="create-folder-action">
+            <el-input 
+              v-model="newFolderName" 
+              placeholder="在此目录下新建文件夹" 
+              size="small" 
+              @keyup.enter="handleInlineCreateFolder"
+            >
+              <template #append>
+                <el-button @click="handleInlineCreateFolder" :loading="creatingFolder">新建</el-button>
+              </template>
+            </el-input>
+          </div>
+          <div class="dialog-actions">
+            <el-button @click="folderDialogVisible = false">取消</el-button>
+            <el-button type="primary" @click="confirmFolderSelection">确认选择</el-button>
+          </div>
+        </div>
       </template>
     </el-dialog>
 
@@ -169,7 +220,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { Plus, Play, Edit, Trash2, RefreshCw } from 'lucide-vue-next'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getTasks, createTask, updateTask, deleteTask, runTask, previewTask } from '../api/task'
@@ -188,6 +239,22 @@ const previewData = ref([])
 
 // 路径到 ID 的映射，用于辅助新建文件夹
 const pathIdMap = ref({ '/': '' })
+
+// 独立目录弹窗相关
+const folderDialogVisible = ref(false)
+const folderTreeRef = ref(null)
+const selectedTreePath = ref('')
+const newFolderName = ref('')
+const creatingFolder = ref(false)
+
+const selectedAccountPlatform = computed(() => {
+  if (!form.value.account_id) return ''
+  const account = accounts.value.find(acc => acc.id === form.value.account_id)
+  if (account) {
+    return account.platform === '139' ? '移动云盘' : 'Quark'
+  }
+  return ''
+})
 
 const form = ref({
   id: null,
@@ -237,36 +304,50 @@ const loadFolders = async (node, resolve) => {
   }
 }
 
-// 新建文件夹处理
-const handleCreateFolder = () => {
-  if (!form.value.account_id) return ElMessage.warning('请先选择执行账号')
+// 内嵌新建文件夹处理
+const handleInlineCreateFolder = async () => {
+  if (!newFolderName.value.trim()) {
+    return ElMessage.warning('请输入文件夹名称')
+  }
   
-  ElMessageBox.prompt('请输入文件夹名称', '新建文件夹', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
-    inputPlaceholder: '如：我的资源'
-  }).then(async ({ value }) => {
-    if (!value) return
-    try {
-      const parentPath = form.value.save_path || '/'
-      const parentID = pathIdMap.value[parentPath]
-      
-      // 如果我们知道当前路径对应的 ID，则立即调用后端创建
-      if (parentID !== undefined) {
-        await createFolder(form.value.account_id, parentID, parentPath, value)
-        ElMessage.success('文件夹创建成功，请重新展开目录树以查看')
-      } else {
-        // 如果不知道 ID（例如手动输入的路径），则只在前端追加路径
-        ElMessage.success('保存路径已更新，目标文件夹将在执行转存时自动创建')
+  // 如果没有选中树节点，默认在根目录创建
+  const currentPath = selectedTreePath.value || '/'
+  const currentID = pathIdMap.value[currentPath]
+
+  if (currentID === undefined) {
+    return ElMessage.warning('无法确定当前选中目录的 ID，请重新展开该节点')
+  }
+
+  creatingFolder.value = true
+  try {
+    const res = await createFolder(form.value.account_id, currentID, currentPath, newFolderName.value.trim())
+    ElMessage.success('文件夹创建成功')
+    
+    // 更新映射表
+    pathIdMap.value[res.path] = res.id
+    
+    // 动态向 ElTree 追加新节点
+    if (folderTreeRef.value) {
+      const currentNode = folderTreeRef.value.getNode(currentPath)
+      if (currentNode) {
+        folderTreeRef.value.append(res, currentNode)
+        currentNode.expanded = true // 确保父节点展开以显示新节点
       }
-      
-      // 统一在前端更新路径显示
-      const newPath = parentPath === '/' ? '/' + value : parentPath + '/' + value
-      form.value.save_path = newPath
-    } catch (err) {
-      console.error(err)
     }
-  })
+    
+    // 自动选中新建的文件夹
+    selectedTreePath.value = res.path
+    if (folderTreeRef.value) {
+       folderTreeRef.value.setCurrentKey(res.path)
+    }
+    
+    // 清空输入框
+    newFolderName.value = ''
+  } catch (err) {
+    console.error('创建文件夹失败:', err)
+  } finally {
+    creatingFolder.value = false
+  }
 }
 
 // 重命名预览处理
@@ -291,6 +372,27 @@ const handlePreview = async () => {
 const handleAccountChange = () => {
   form.value.save_path = '/'
   pathIdMap.value = { '/': '' }
+}
+
+const openFolderDialog = () => {
+  if (!form.value.account_id) {
+    return ElMessage.warning('请先选择执行账号')
+  }
+  // 尝试将当前输入框的路径作为默认选中（如果存在于树中）
+  selectedTreePath.value = form.value.save_path || '/'
+  newFolderName.value = ''
+  folderDialogVisible.value = true
+}
+
+const handleTreeCurrentChange = (data) => {
+  selectedTreePath.value = data.path
+}
+
+const confirmFolderSelection = () => {
+  if (selectedTreePath.value) {
+    form.value.save_path = selectedTreePath.value
+  }
+  folderDialogVisible.value = false
 }
 
 const openAddDialog = () => {
@@ -433,6 +535,41 @@ html.dark .task-name-cell .name {
   display: flex;
   gap: 12px;
   align-items: center;
+}
+
+.save-path-input {
+  width: 100%;
+}
+
+.save-path-input :deep(.el-input-group__prepend) {
+  background-color: var(--el-fill-color-light);
+  color: var(--el-text-color-regular);
+  font-weight: bold;
+}
+
+.folder-tree-container {
+  height: 400px;
+  overflow-y: auto;
+  border: 1px solid var(--el-border-color-light);
+  border-radius: 4px;
+  padding: 8px;
+}
+
+.folder-dialog-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.create-folder-action {
+  flex: 1;
+  margin-right: 20px;
+  max-width: 300px;
+}
+
+.dialog-actions {
+  flex-shrink: 0;
 }
 
 .preview-action {
