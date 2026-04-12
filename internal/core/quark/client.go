@@ -549,7 +549,7 @@ func (q *Quark) ParseShare(ctx context.Context, shareURL, extractCode string) ([
 	for _, item := range detailRes.Data.List {
 		updateTime := time.Unix(item.UpdateAt/1000, 0)
 		files = append(files, core.FileInfo{
-			ID:         fmt.Sprintf("%s|%s|%s", item.Fid, item.ShareFidToken, stoken), // 组合 ID 供 SaveFileTo 使用
+			ID:         item.Fid, // 关键修复：仅使用稳定的 Fid 作为 ID
 			Name:       item.FileName,
 			IsFolder:   item.Dir,
 			Size:       item.Size,
@@ -558,7 +558,8 @@ func (q *Quark) ParseShare(ctx context.Context, shareURL, extractCode string) ([
 		})
 	}
 	return files, nil
-}
+	}
+
 
 func (q *Quark) SaveFileTo(ctx context.Context, fileID, targetPath string) error {
 	_ = ctx
