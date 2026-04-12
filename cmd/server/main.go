@@ -1,15 +1,29 @@
 package main
 
 import (
+	"io"
 	"log"
 	"os"
+
 	"github.com/zcq/clouddrive-auto-save/internal/api"
 	"github.com/zcq/clouddrive-auto-save/internal/core/worker"
 	"github.com/zcq/clouddrive-auto-save/internal/db"
+	"github.com/zcq/clouddrive-auto-save/internal/utils"
 )
 
+type BroadcasterWriter struct{}
+
+func (w *BroadcasterWriter) Write(p []byte) (n int, err error) {
+	utils.GlobalBroadcaster.Broadcast(string(p))
+	return len(p), nil
+}
+
 func main() {
+	// 0. 劫持日志输出，镜像到广播器
+	log.SetOutput(io.MultiWriter(os.Stdout, &BroadcasterWriter{}))
+
 	// 1. 初始化数据库
+
 	dbPath := os.Getenv("DB_PATH")
 	if dbPath == "" {
 		dbPath = "data.db"
