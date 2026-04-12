@@ -16,10 +16,10 @@
 | :--- | :--- | :--- | :--- |
 | `name` | string | 是 | 任务显示名称 |
 | `account_id` | uint | 是 | 关联的账号 ID |
-| `share_url` | string | 是 | 139/Quark 分享链接 |
+| `share_url` | string | 是 | 139/Quark 分享链接 (支持子目录链接) |
 | `extract_code`| string | 否 | 分享提取码 |
 | `save_path` | string | 是 | 云盘内保存路径 (如 `/Movies`) |
-| `start_date` | string | 否 | 起始日期过滤 (ISO8601)，仅转存此时间后的文件 |
+| `start_file_id`| string | 否 | 起始文件 ID，系统将从此文件开始(含)向前转存 |
 | `pattern` | string | 否 | 正则匹配表达式 |
 | `replacement` | string | 否 | 替换模板及魔法变量 |
 
@@ -49,8 +49,8 @@
 
 ---
 
-## 6. 任务重命名与过滤预览
-在保存任务前，基于真实分享链接的内容，预览日期过滤和重命名规则的执行效果。
+## 6. 任务重命名与预览
+在保存任务前，基于真实分享链接的内容，预览重命名规则的执行效果。
 
 - **URL**: `/tasks/preview`
 - **Method**: `POST`
@@ -60,7 +60,6 @@
 | `account_id` | uint | 模拟执行的账号 ID |
 | `share_url` | string | 待解析的分享链接 |
 | `extract_code`| string | 提取码 |
-| `start_date` | string | 起始日期过滤 |
 | `pattern` | string | 正则表达式 |
 | `replacement` | string | 替换规则 |
 | `name` | string | 任务名称（用于 `{TASKNAME}` 变量替换） |
@@ -73,4 +72,19 @@
 | `original_name`| string | 原始文件名 |
 | `new_name` | string | 重命名后的名称 |
 | `matched` | bool | 正则是否匹配成功 |
-| `is_filtered` | bool | 是否因日期规则被过滤（跳过） |
+
+---
+
+## 7. 解析分享链接详情
+仅用于拉取分享链接内的文件列表，供用户在 UI 中选择起始转存点。
+
+- **URL**: `/tasks/parse_share`
+- **Method**: `POST`
+- **Payload**:
+| 字段 | 类型 | 说明 |
+| :--- | :--- | :--- |
+| `account_id` | uint | 关联的账号 ID |
+| `share_url` | string | 待解析的分享链接 |
+| `extract_code`| string | 提取码 |
+
+- **Response**: `Array<FileInfo>` (包含文件名、ID、更新时间等)

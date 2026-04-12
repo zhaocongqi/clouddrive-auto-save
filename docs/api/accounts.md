@@ -61,7 +61,7 @@
 - **Method**: `GET`
 - **Params**:
     - `parent_id`: 父目录 ID（夸克为 FID，139 为路径或 ID）。默认为空（根目录）。
-    - `parent_path`: 父目录的绝对路径。用于构造返回项的完整路径。
+    - `parent_path`: 父目录的绝对路径。用于后端自动拼接并返回子目录的完整 `path` 字段。
 - **Response**: `Array<FolderItem>`
 
 ### FolderItem 对象结构
