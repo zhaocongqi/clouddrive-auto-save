@@ -68,37 +68,37 @@ func (m *Manager) worker(id int) {
 			if !ok {
 				return
 			}
-			m.execute(job)
+			m.execute(job.Task)
 		}
 	}
 }
 
-func (m *Manager) execute(job Job) {
-	task := job.Task
+func (m *Manager) execute(task *db.Task) {
 	log.Printf("Executing task: %s (ID: %d)", task.Name, task.ID)
+	log.Printf("[PROGRESS:%d:Started:任务已进入执行队列]", task.ID)
 
 	// 1. 更新任务状态为 running
 	db.DB.Model(task).Update("status", "running")
 
-	// 2. 获取对应的云盘驱动
 	driver := core.GetDriver(&task.Account)
 	if driver == nil {
-		m.finishTask(task, "failed", fmt.Sprintf("Driver not found for platform: %s", task.Account.Platform))
+		m.finishTask(task, "failed", "Driver not found")
 		return
 	}
 
-	// 3. 执行转存逻辑
+	// 2. 执行转存逻辑
 	ctx, cancel := context.WithTimeout(m.ctx, 30*time.Minute)
 	defer cancel()
 
-	// 3.1 获取分享全量文件
+	// 2.1 获取分享全量文件
+	log.Printf("[PROGRESS:%d:Parsing:正在解析分享链接...]", task.ID)
 	files, err := driver.ParseShare(ctx, task.ShareURL, task.ExtractCode)
 	if err != nil {
 		m.finishTask(task, "failed", fmt.Sprintf("Failed to parse share: %v", err))
 		return
 	}
 
-	// 3.2 日期与 ID 过滤
+	// 2.2 日期与 ID 过滤
 	var filteredIDs []string
 	for _, f := range files {
 		// 1. 检查日期过滤：如果设置了开始日期，且文件时间早于开始日期，则跳过
@@ -117,21 +117,25 @@ func (m *Manager) execute(job Job) {
 	}
 
 	if len(filteredIDs) == 0 {
+		log.Printf("[PROGRESS:%d:Finished:无新文件需要转存]", task.ID)
 		m.finishTask(task, "success", "No new files to transfer (all filtered by date)")
 		return
 	}
 
-	// 3.3 执行转存
+	// 2.3 执行转存
+	log.Printf("[PROGRESS:%d:Saving:正在转存 %d 个文件...]", task.ID, len(filteredIDs))
 	err = driver.SaveLink(ctx, task.ShareURL, task.ExtractCode, task.SavePath, filteredIDs)
 	if err != nil {
 		m.finishTask(task, "failed", err.Error())
 		return
 	}
 
-	// 4. TODO: 执行重命名引擎逻辑 (后续实现)
+	// 3. TODO: 执行重命名引擎逻辑 (后续实现)
 
+	log.Printf("[PROGRESS:%d:Finished:转存任务全部完成]", task.ID)
 	m.finishTask(task, "success", "Transfer completed successfully")
 }
+
 
 func (m *Manager) finishTask(task *db.Task, status, message string) {
 	task.Status = status
