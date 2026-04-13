@@ -40,9 +40,9 @@ func main() {
 	defer wm.Stop()
 
 	// 3. 启动 API 服务
-	log.Println("Starting API server on :8080...")
+	log.Println("Starting API server on 127.0.0.1:8080...")
 	r := api.InitRouter(wm)
-	if err := r.Run(":8080"); err != nil {
+	if err := r.Run("127.0.0.1:8080"); err != nil {
 		log.Fatalf("Failed to start API server: %v", err)
 	}
 }

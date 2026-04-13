@@ -220,14 +220,26 @@ func streamLogs(c *gin.Context) {
 	c.Header("Content-Type", "text/event-stream")
 	c.Header("Cache-Control", "no-cache")
 	c.Header("Connection", "keep-alive")
-	c.Header("Transfer-Encoding", "chunked")
+	c.Header("X-Accel-Buffering", "no") // 禁用 Nginx 等代理的缓存
+
+	heartbeat := time.NewTicker(20 * time.Second)
+	defer heartbeat.Stop()
 
 	c.Stream(func(w io.Writer) bool {
-		if msg, ok := <-clientChan; ok {
+		select {
+		case <-c.Request.Context().Done():
+			return false
+		case msg, ok := <-clientChan:
+			if !ok {
+				return false
+			}
 			c.SSEvent("message", msg)
 			return true
+		case <-heartbeat.C:
+			// 发送心跳，防止连接超时断开
+			c.SSEvent("heartbeat", "keep-alive")
+			return true
 		}
-		return false
 	})
 }
 
