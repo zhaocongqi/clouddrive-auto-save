@@ -49,8 +49,12 @@
 手动触发后端模拟登录，校验凭证是否有效并更新昵称、容量及会员信息。
 
 - **URL**: `/accounts/:id/check`
-- **Method**: `POST`
+- **Method**: `/POST`
 - **Response**: 返回更新后的账号对象。
+- **Errors**:
+    - `401 Unauthorized`: 登录凭证失效（如 Token 过期），Body 中包含 `{"error": "登录已失效 (Token Invalid)"}`。
+    - `404 Not Found`: 账号不存在。
+    - `500 Internal Server Error`: 驱动加载失败或系统内部错误。
 
 ---
 

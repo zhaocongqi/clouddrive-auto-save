@@ -28,15 +28,30 @@
     - `userDomainId`: 用户核心标识（容量查询必填）。
     - `userProfileInfo.userName`: 最新的昵称字段所在路径。
     - `auth.memberLevel`: 部分版本在此处返回会员等级。
-    - `loginName / account`: 用户的真实手机号。
+    - `loginName / account / msisdn / phoneNumber`: 用户的真实手机号。
+    - `userServiceType`: 用户服务类型标识（如 "8" 代表移动云盘会员）。
 - **获取云盘配额 (getPersonalDiskInfo)**: 
   - `POST /user/disk/getPersonalDiskInfo` (User Host)
   - Body: `{"userDomainId": "xxx"}`
   - 返回: `diskSize`, `freeDiskSize` (MB)。
 - **获取会员等级 (queryUserBenefits)**: 
   - `POST /orchestration/group-rebuild/member/v1.0/queryUserBenefits` (Base Host)
+  - **鉴权要求**: 必须携带 `mcloud-sign` 签名（基于 Body 计算）。
   - Body: `{"isNeedBenefit": 1, "commonAccountInfo": {"account": "手机号", "accountType": 1}}`
-  - 返回: 会员列表及 `memberLevel`。
+  - 返回会员权益列表：
+    - `1`: 普通会员
+    - `2`: 白银会员
+    - `3`: 黄金会员
+    - `4`: 钻石会员
+
+### 1.3 核心鉴权与异常处理
+- **动态签名 (mcloud-sign)**:
+  用于 HCY 及 Orchestration 系列接口。
+  - **Orchestration 接口签名**: 必须基于请求 Body、当前时间戳及 16 位随机字符串计算二次 MD5 哈希。
+- **Token 异常状态码**:
+  - `05050009`: 非法的 Token（通常指 Authorization 已过期或错误）。
+  - `1010010003`: 登录已失效。
+  - `1010010014`: 签名校验失败。
 
 ### 1.3 私有文件操作 (HCY 系列)
 - **文件列表 (list)**: 
