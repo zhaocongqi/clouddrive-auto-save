@@ -29,7 +29,7 @@
           <template #default="{ row }">
             <el-tag :type="getStatusType(row.status)">
               <div class="status-inner">
-                <el-icon v-if="row.status === 'running'" class="is-loading"><RefreshCw /></el-icon>
+                <el-icon v-if="row.status === 'running'" class="icon-spin"><RefreshCw /></el-icon>
                 {{ row.status.toUpperCase() }}
               </div>
             </el-tag>
@@ -93,7 +93,7 @@
         <div v-if="shareFiles.length > 0 || parsingShare" class="share-files-section">
           <div class="section-title">
             <span>选择起始转存点 (可选)</span>
-            <el-icon v-if="parsingShare" class="is-loading"><RefreshCw /></el-icon>
+            <el-icon v-if="parsingShare" class="icon-spin"><RefreshCw /></el-icon>
           </div>
           
           <el-table 
@@ -598,7 +598,7 @@ html.dark .task-name-cell .name {
   gap: 6px;
 }
 
-.is-loading {
+.icon-spin {
   animation: rotate 2s linear infinite;
 }
 
