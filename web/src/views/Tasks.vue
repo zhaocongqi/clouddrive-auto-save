@@ -89,51 +89,24 @@
           </el-col>
         </el-row>
 
-        <!-- 分享文件列表与起始点选择 -->
-        <div v-if="shareFiles.length > 0 || parsingShare" class="share-files-section">
-          <div class="section-title">
-            <span>选择起始转存点 (可选)</span>
-            <el-icon v-if="parsingShare" class="icon-spin"><RefreshCw /></el-icon>
+        <el-form-item label="起始转存点 (可选)">
+          <div class="path-input-group">
+            <el-input 
+              v-model="selectedStartFileName" 
+              placeholder="从该文件开始向前转存 (为空则转存全量)" 
+              readonly
+              class="save-path-input"
+            >
+              <template #append>
+                <el-button @click="openStartFileDialog" :loading="parsingShare">选择文件</el-button>
+              </template>
+            </el-input>
           </div>
-          
-          <el-table 
-            :data="shareFiles" 
-            max-height="250" 
-            size="small" 
-            border 
-            stripe 
-            v-loading="parsingShare"
-            highlight-current-row
-          >
-            <el-table-column width="50" align="center">
-              <template #default="{ row }">
-                <el-radio v-model="form.start_file_id" :label="row.id">&nbsp;</el-radio>
-              </template>
-            </el-table-column>
-            <el-table-column label="从该文件开始 (含)" show-overflow-tooltip>
-              <template #default="{ row }">
-                <div style="display: flex; align-items: center; gap: 8px">
-                  <el-icon size="18">
-                    <Folder v-if="row.is_folder" color="#eab308" />
-                    <File v-else color="#64748b" />
-                  </el-icon>
-                  <span :style="{ fontWeight: row.is_folder ? '600' : 'normal' }">{{ row.name }}</span>
-                </div>
-              </template>
-            </el-table-column>
-            <el-table-column label="类型" width="80" align="center">
-              <template #default="{ row }">
-                <el-tag size="small" :type="row.is_folder ? 'warning' : 'info'" effect="plain">
-                  {{ row.is_folder ? '文件夹' : '文件' }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="updated_at" label="更新时间" width="150" sortable />
-          </el-table>
-          <div class="share-tips">
-            * 逻辑：系统将从选中的文件开始，按更新时间向前转存所有更新的文件。
+          <div class="start-id-tip" v-if="form.start_file_id">
+            <el-icon><Info /></el-icon>
+            <span>当前已锁定 ID: <code class="id-code" :title="form.start_file_id">{{ form.start_file_id }}</code></span>
           </div>
-        </div>
+        </el-form-item>
 
         <el-form-item label="保存路径" required>
           <div class="path-input-group">
@@ -200,21 +173,16 @@
         >
           <template #default="{ node, data }">
             <span class="custom-tree-node">
+              <el-icon><Folder /></el-icon>
               <span>{{ node.label }}</span>
             </span>
           </template>
         </el-tree>
       </div>
-      
       <template #footer>
         <div class="folder-dialog-footer">
           <div class="create-folder-action">
-            <el-input 
-              v-model="newFolderName" 
-              placeholder="在此目录下新建文件夹" 
-              size="small" 
-              @keyup.enter="handleInlineCreateFolder"
-            >
+            <el-input v-model="newFolderName" placeholder="新文件夹名称" size="default">
               <template #append>
                 <el-button @click="handleInlineCreateFolder" :loading="creatingFolder">新建</el-button>
               </template>
@@ -222,14 +190,70 @@
           </div>
           <div class="dialog-actions">
             <el-button @click="folderDialogVisible = false">取消</el-button>
-            <el-button type="primary" @click="confirmFolderSelection">确认选择</el-button>
+            <el-button type="primary" @click="confirmFolderSelection">确认路径</el-button>
           </div>
         </div>
       </template>
     </el-dialog>
 
+    <!-- 选择起始文件独立弹窗 -->
+    <el-dialog 
+      v-model="startFileDialogVisible" 
+      title="选择起始转存文件" 
+      width="700px"
+      append-to-body
+      destroy-on-close
+    >
+      <div class="share-files-dialog-content">
+        <el-alert title="逻辑说明" type="info" :closable="false" show-icon style="margin-bottom: 15px">
+          系统将从选中的文件开始，按更新时间向前转存所有更新的文件（含所选文件本身）。
+        </el-alert>
+        
+        <el-table 
+          :data="shareFiles" 
+          max-height="400" 
+          size="default" 
+          border 
+          stripe 
+          v-loading="parsingShare"
+          highlight-current-row
+          @current-change="handleStartFileTableChange"
+        >
+          <el-table-column width="55" align="center">
+            <template #default="{ row }">
+              <el-radio v-model="tempStartFileId" :label="row.id">&nbsp;</el-radio>
+            </template>
+          </el-table-column>
+          <el-table-column label="文件名" show-overflow-tooltip min-width="200">
+            <template #default="{ row }">
+              <div style="display: flex; align-items: center; gap: 8px">
+                <el-icon size="18">
+                  <Folder v-if="row.is_folder" color="#eab308" />
+                  <File v-else color="#64748b" />
+                </el-icon>
+                <span :style="{ fontWeight: row.is_folder ? '600' : 'normal' }">{{ row.name }}</span>
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column label="类型" width="90" align="center">
+            <template #default="{ row }">
+              <el-tag size="small" :type="row.is_folder ? 'warning' : 'info'" effect="plain">
+                {{ row.is_folder ? '文件夹' : '文件' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="updated_at" label="更新时间" width="170" sortable />
+        </el-table>
+      </div>
+      <template #footer>
+        <el-button @click="startFileDialogVisible = false">取消</el-button>
+        <el-button @click="clearStartFile">清除选择</el-button>
+        <el-button type="primary" @click="confirmStartFileSelection">确认选择</el-button>
+      </template>
+    </el-dialog>
+
     <!-- 预览结果对话框 -->
-    <el-dialog v-model="previewVisible" title="重命名效果预览" width="800px">
+    <el-dialog v-model="previewVisible" title="重命名预览" width="800px">
       <el-table :data="previewData" height="400px" border stripe>
         <el-table-column prop="original_name" label="原始文件名" min-width="200" show-overflow-tooltip />
         <el-table-column label="重命名后效果" min-width="200" show-overflow-tooltip>
@@ -256,12 +280,11 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
-import { Plus, Play, Edit, Trash2, RefreshCw, Folder, File } from 'lucide-vue-next'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { Plus, Play, Edit, Trash2, RefreshCw, Folder, File, Info } from 'lucide-vue-next'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getTasks, createTask, updateTask, deleteTask, runTask, previewTask, parseShareLink } from '../api/task'
 import { getAccounts, getFolders, createFolder } from '../api/account'
-import { debounce } from 'lodash-es'
 
 const taskList = ref([])
 const accounts = ref([])
@@ -280,6 +303,9 @@ const pathIdMap = ref({ '/': '' })
 // 分享内容解析相关
 const shareFiles = ref([])
 const parsingShare = ref(false)
+const startFileDialogVisible = ref(false)
+const selectedStartFileName = ref('')
+const tempStartFileId = ref('')
 
 // 独立目录弹窗相关
 const folderDialogVisible = ref(false)
@@ -309,14 +335,17 @@ const form = ref({
   start_file_id: ''
 })
 
-// 防抖解析分享链接
-const handleAutoParseShare = debounce(async () => {
+// 手动打开解析起始文件的对话框
+const openStartFileDialog = async () => {
   if (!form.value.share_url || !form.value.account_id) {
-    shareFiles.value = []
-    return
+    return ElMessage.warning('请先填写执行账号和分享链接')
   }
   
+  startFileDialogVisible.value = true
   parsingShare.value = true
+  tempStartFileId.value = form.value.start_file_id
+  shareFiles.value = []
+  
   try {
     const data = await parseShareLink({
       account_id: form.value.account_id,
@@ -324,16 +353,46 @@ const handleAutoParseShare = debounce(async () => {
       extract_code: form.value.extract_code
     })
     shareFiles.value = data
+    
+    // 如果已经有选中的 ID，尝试匹配出文件名用于回显
+    if (form.value.start_file_id) {
+      const selected = data.find(f => f.id === form.value.start_file_id)
+      if (selected) {
+        selectedStartFileName.value = selected.name
+      }
+    }
   } catch (err) {
     console.error('解析链接失败:', err)
-    shareFiles.value = []
+    ElMessage.error('解析分享链接失败，请检查链接或账号状态')
+    startFileDialogVisible.value = false
   } finally {
     parsingShare.value = false
   }
-}, 800)
+}
 
-// 监听变动
-watch(() => [form.value.share_url, form.value.account_id, form.value.extract_code], handleAutoParseShare)
+const handleStartFileTableChange = (row) => {
+  if (row) {
+    tempStartFileId.value = row.id
+  }
+}
+
+const confirmStartFileSelection = () => {
+  if (tempStartFileId.value) {
+    form.value.start_file_id = tempStartFileId.value
+    const selected = shareFiles.value.find(f => f.id === tempStartFileId.value)
+    if (selected) {
+      selectedStartFileName.value = selected.name
+    }
+  }
+  startFileDialogVisible.value = false
+}
+
+const clearStartFile = () => {
+  form.value.start_file_id = ''
+  selectedStartFileName.value = ''
+  tempStartFileId.value = ''
+  startFileDialogVisible.value = false
+}
 
 let pollTimer = null
 
@@ -360,7 +419,6 @@ const loadFolders = async (node, resolve) => {
   const parentPath = node.level === 0 ? '/' : node.data.path
   try {
     const folders = await getFolders(form.value.account_id, parentID, parentPath)
-    // 更新映射表
     folders.forEach(f => {
       pathIdMap.value[f.path] = f.id
     })
@@ -377,7 +435,6 @@ const handleInlineCreateFolder = async () => {
     return ElMessage.warning('请输入文件夹名称')
   }
   
-  // 如果没有选中树节点，默认在根目录创建
   const currentPath = selectedTreePath.value || '/'
   const currentID = pathIdMap.value[currentPath]
 
@@ -389,26 +446,18 @@ const handleInlineCreateFolder = async () => {
   try {
     const res = await createFolder(form.value.account_id, currentID, currentPath, newFolderName.value.trim())
     ElMessage.success('文件夹创建成功')
-    
-    // 更新映射表
     pathIdMap.value[res.path] = res.id
-    
-    // 动态向 ElTree 追加新节点
     if (folderTreeRef.value) {
       const currentNode = folderTreeRef.value.getNode(currentPath)
       if (currentNode) {
         folderTreeRef.value.append(res, currentNode)
-        currentNode.expanded = true // 确保父节点展开以显示新节点
+        currentNode.expanded = true
       }
     }
-    
-    // 自动选中新建的文件夹
     selectedTreePath.value = res.path
     if (folderTreeRef.value) {
        folderTreeRef.value.setCurrentKey(res.path)
     }
-    
-    // 清空输入框
     newFolderName.value = ''
   } catch (err) {
     console.error('创建文件夹失败:', err)
@@ -438,6 +487,8 @@ const handlePreview = async () => {
 // 切换账号处理
 const handleAccountChange = () => {
   form.value.save_path = '/'
+  form.value.start_file_id = ''
+  selectedStartFileName.value = ''
   pathIdMap.value = { '/': '' }
 }
 
@@ -445,7 +496,6 @@ const openFolderDialog = () => {
   if (!form.value.account_id) {
     return ElMessage.warning('请先选择执行账号')
   }
-  // 尝试将当前输入框的路径作为默认选中（如果存在于树中）
   selectedTreePath.value = form.value.save_path || '/'
   newFolderName.value = ''
   folderDialogVisible.value = true
@@ -465,12 +515,14 @@ const confirmFolderSelection = () => {
 const openAddDialog = () => {
   form.value = { id: null, name: '', account_id: '', share_url: '', extract_code: '', save_path: '/', pattern: '', replacement: '', start_file_id: '' }
   shareFiles.value = []
+  selectedStartFileName.value = ''
   dialogVisible.value = true
 }
 
-const handleEdit = (row) => {
-  // 立即清空旧的分享文件列表，防止界面残留
+const handleEdit = async (row) => {
   shareFiles.value = []
+  // 初始回显 ID 信息
+  selectedStartFileName.value = row.start_file_id ? `载入中 (ID: ${row.start_file_id})...` : ''
   
   form.value = { 
     id: row.id,
@@ -484,10 +536,24 @@ const handleEdit = (row) => {
     start_file_id: row.start_file_id
   }
   dialogVisible.value = true
-  
-  // 关键修复：编辑时如果链接存在，立即手动触发一次解析
-  if (form.value.share_url && form.value.account_id) {
-    handleAutoParseShare()
+
+  // 关键优化：如果带有起始文件 ID，尝试在后台找回文件名
+  if (row.start_file_id && row.share_url) {
+    try {
+      const data = await parseShareLink({
+        account_id: row.account_id,
+        share_url: row.share_url,
+        extract_code: row.extract_code
+      })
+      const found = data.find(f => f.id === row.start_file_id)
+      if (found) {
+        selectedStartFileName.value = found.name
+      } else {
+        selectedStartFileName.value = `ID: ${row.start_file_id} (文件在分享中已失效)`
+      }
+    } catch (err) {
+      selectedStartFileName.value = `ID: ${row.start_file_id}`
+    }
   }
 }
 
@@ -533,12 +599,7 @@ const handleDelete = (row) => {
 }
 
 const getStatusType = (status) => {
-  const map = {
-    pending: 'info',
-    running: 'primary',
-    success: 'success',
-    failed: 'danger'
-  }
+  const map = { pending: 'info', running: 'primary', success: 'success', failed: 'danger' }
   return map[status] || 'info'
 }
 
@@ -613,37 +674,31 @@ html.dark .task-name-cell .name {
   align-items: center;
 }
 
-.share-files-section {
-  margin-bottom: 20px;
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 8px;
-  padding: 12px;
-  background-color: var(--el-fill-color-blank);
-}
-
-.share-files-section .section-title {
-  font-size: 13px;
-  font-weight: bold;
-  margin-bottom: 10px;
-  color: var(--el-text-color-primary);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.filter-options {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background-color: var(--el-fill-color-lighter);
-  padding: 8px;
-  border-radius: 4px;
-}
-
-.filter-label {
+.start-id-tip {
+  margin-top: 6px;
   font-size: 12px;
-  color: var(--el-text-color-regular);
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.id-code {
+  background-color: var(--el-fill-color-light);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: monospace;
+  color: var(--el-color-primary);
+  max-width: 300px;
+  display: inline-block;
+  vertical-align: bottom;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.share-files-dialog-content {
+  padding: 10px 0;
 }
 
 .share-tips {
@@ -715,5 +770,11 @@ html.dark .task-name-cell .name {
 
 .unmatched-text {
   color: #f59e0b;
+}
+
+.custom-tree-node {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 </style>
