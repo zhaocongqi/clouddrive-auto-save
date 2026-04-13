@@ -214,6 +214,7 @@ func (c *Cloud139) doRequest(ctx context.Context, method, apiURL string, body in
 // ─── CloudDrive 接口实现 ───────────────────────────────────────────────────────
 
 func (c *Cloud139) GetInfo(ctx context.Context) (*db.Account, error) {
+	log.Printf("[139] 正在获取账号信息...")
 	headers := map[string]string{
 		"caller":         "web",
 		"x-m4c-caller":   "PC",
@@ -222,8 +223,11 @@ func (c *Cloud139) GetInfo(ctx context.Context) (*db.Account, error) {
 	}
 	resp, err := c.doRequest(ctx, "POST", UserNjsURL+"/user/getUser", map[string]interface{}{}, headers)
 	if err != nil {
+		log.Printf("[139] 获取用户信息请求失败: %v", err)
 		return nil, err
 	}
+
+	log.Printf("[139 Debug] getUser 原始响应: %s", string(resp))
 
 	var resRaw map[string]interface{}
 	if err := json.Unmarshal(resp, &resRaw); err != nil {
@@ -304,6 +308,8 @@ func (c *Cloud139) GetInfo(ctx context.Context) (*db.Account, error) {
 		c.account.AccountName = nickname
 	}
 
+	log.Printf("[139] 账号校验成功: %s (%s)", c.account.Nickname, c.account.AccountName)
+
 	if userDomainID != "" {
 		diskReq := map[string]interface{}{"userDomainId": userDomainID}
 		diskResp, err := c.doRequest(ctx, "POST", UserNjsURL+"/user/disk/getPersonalDiskInfo", diskReq, headers)
@@ -335,6 +341,7 @@ func (c *Cloud139) ListFiles(ctx context.Context, parentID string) ([]core.FileI
 	if parentID == "" {
 		parentID = "/"
 	}
+	log.Printf("[139] 正在列出目录文件: %s", parentID)
 	sign := c.computeMcloudSign(parentID)
 	headers := map[string]string{
 		"mcloud-sign":            sign,
@@ -356,6 +363,7 @@ func (c *Cloud139) ListFiles(ctx context.Context, parentID string) ([]core.FileI
 
 	resp, err := c.doRequest(ctx, "POST", PersonalKdNjsURL+"/hcy/file/list", body, headers)
 	if err != nil {
+		log.Printf("[139] 列出目录请求失败: %v", err)
 		return nil, err
 	}
 
@@ -391,6 +399,7 @@ func (c *Cloud139) ListFiles(ctx context.Context, parentID string) ([]core.FileI
 			UpdateTime: updateTime,
 		})
 	}
+	log.Printf("[139] 目录列出完成: %s, 发现 %d 个项", parentID, len(files))
 	return files, nil
 }
 
@@ -398,6 +407,7 @@ func (c *Cloud139) CreateFolder(ctx context.Context, parentID, name string) (*co
 	if parentID == "" {
 		parentID = "/"
 	}
+	log.Printf("[139] 正在创建文件夹: Name=%s, ParentID=%s", name, parentID)
 	sign := c.computeMcloudSign(parentID)
 	headers := map[string]string{
 		"mcloud-sign": sign,
@@ -409,6 +419,7 @@ func (c *Cloud139) CreateFolder(ctx context.Context, parentID, name string) (*co
 	}
 	resp, err := c.doRequest(ctx, "POST", PersonalKdNjsURL+"/hcy/file/create", body, headers)
 	if err != nil {
+		log.Printf("[139] 创建文件夹请求失败: %v", err)
 		return nil, err
 	}
 	var res struct {
@@ -433,6 +444,7 @@ func (c *Cloud139) CreateFolder(ctx context.Context, parentID, name string) (*co
 		finalID = res.Data.ID
 	}
 
+	log.Printf("[139] 文件夹创建成功: %s", name)
 	return &core.FileInfo{
 		ID:       finalID,
 		Name:     name,

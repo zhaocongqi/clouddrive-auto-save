@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
@@ -137,6 +137,7 @@ func (q *Quark) doRequest(ctx context.Context, method, apiURL string, query url.
 	}
 
 	if resp.StatusCode != http.StatusOK {
+		log.Printf("[Quark Debug] 请求异常: %s %s, StatusCode=%d, Body=%s", method, fullURL, resp.StatusCode, string(respBody))
 		return nil, fmt.Errorf("Quark API HTTP error: %d, body: %s", resp.StatusCode, string(respBody))
 	}
 
@@ -146,6 +147,7 @@ func (q *Quark) doRequest(ctx context.Context, method, apiURL string, query url.
 // ─── CloudDrive 接口实现 ───────────────────────────────────────────────────────
 
 func (q *Quark) GetInfo(ctx context.Context) (*db.Account, error) {
+	log.Printf("[Quark] 正在获取账号信息...")
 	// 预校验 Cookie 格式：PC 网页端接口强制要求包含 __uid
 	if !strings.Contains(q.account.Cookie, "__uid=") {
 		return nil, fmt.Errorf("夸克网盘 Cookie 格式不正确，缺少核心参数 __uid（请确保获取的是全量网页端 Cookie）")
@@ -158,6 +160,7 @@ func (q *Quark) GetInfo(ctx context.Context) (*db.Account, error) {
 
 	resp, err := q.doRequest(ctx, "GET", apiURL, query, nil, false)
 	if err != nil {
+		log.Printf("[Quark] 获取账号信息请求失败: %v", err)
 		return nil, err
 	}
 
@@ -166,15 +169,14 @@ func (q *Quark) GetInfo(ctx context.Context) (*db.Account, error) {
 		return nil, err
 	}
 
-	// 只要有 data 节点且不为空，就认为请求成功
 	data, ok := resRaw["data"].(map[string]interface{})
 	if !ok || data == nil {
 		msg, _ := resRaw["message"].(string)
+		log.Printf("[Quark] 获取基础信息失败: %v, %s", resRaw["code"], msg)
 		return nil, fmt.Errorf("Quark API error: %v, %s", resRaw["code"], msg)
 	}
 
 	nickname, _ := data["nickname"].(string)
-
 	if nickname == "" {
 		nickname = q.account.AccountName
 	}
@@ -189,10 +191,12 @@ func (q *Quark) GetInfo(ctx context.Context) (*db.Account, error) {
 		q.account.AccountName = nickname
 	}
 
+	log.Printf("[Quark] 基础信息获取成功: %s", nickname)
+
 	// 2. 获取容量和 VIP 信息
-	// 如果有 kps，优先调用 App 接口获取 (能识别 88VIP 等细分等级)
 	vipFetched := false
 	if q.mparam["kps"] != "" {
+		log.Printf("[Quark] 发现 kps 参数，尝试调用 App 接口获取容量与会员状态")
 		queryGrowth := url.Values{}
 		growthResp, err := q.doRequest(ctx, "GET", BaseURLApp+"/1/clouddrive/capacity/growth/info", queryGrowth, nil, true)
 		if err == nil && len(growthResp) > 0 {
@@ -217,14 +221,14 @@ func (q *Quark) GetInfo(ctx context.Context) (*db.Account, error) {
 				} else if growthRes.Data.MemberType != "" {
 					q.account.VipName = growthRes.Data.MemberType
 				}
+				log.Printf("[Quark] 容量信息 (App): Total=%.2fGB, Used=%.2fGB, MemberType=%s", float64(q.account.CapacityTotal)/1024/1024/1024, float64(q.account.CapacityUsed)/1024/1024/1024, q.account.VipName)
 				vipFetched = true
 			}
 		}
 	}
 
-	// 如果没有 kps 或者上面的 App 接口失败，降级使用 PC 端网页容量接口
 	if !vipFetched {
-		// 定义待探测的候选 URL 列表（优先尝试用户提供的最新 member 接口）
+		log.Printf("[Quark] 尝试调用 Web 探测接口获取容量信息")
 		apiURLs := []string{
 			"https://pan.quark.cn/1/clouddrive/member?pr=ucpro&fr=pc",
 			"https://drive-pc.quark.cn/1/clouddrive/capacity?pr=ucpro&fr=pc",
@@ -242,11 +246,8 @@ func (q *Quark) GetInfo(ctx context.Context) (*db.Account, error) {
 				continue
 			}
 
-			// 解析探测
 			dataNode, _ := capRaw["data"].(map[string]interface{})
 			metadataNode, _ := capRaw["metadata"].(map[string]interface{})
-
-			// 汇总可用的数据节点
 			resNode := dataNode
 			if resNode == nil {
 				resNode = metadataNode
@@ -256,34 +257,18 @@ func (q *Quark) GetInfo(ctx context.Context) (*db.Account, error) {
 			}
 
 			if resNode != nil {
-				// 1. 提取容量
 				capInfo, _ := resNode["cap_info"].(map[string]interface{})
 				if capInfo == nil {
 					capInfo = resNode
 				}
 
-				total := float64(0)
-				used := float64(0)
-
-				// 兼容多种字段名：total/used (PC) vs cap_total/cap_used (User) vs total_capacity/use_capacity (Member)
-				if v, ok := capInfo["total"].(float64); ok {
-					total = v
-				}
-				if v, ok := capInfo["total_capacity"].(float64); ok {
-					total = v
-				}
-				if v, ok := capInfo["cap_total"].(float64); ok {
-					total = v
-				}
-				if v, ok := capInfo["used"].(float64); ok {
-					used = v
-				}
-				if v, ok := capInfo["use_capacity"].(float64); ok {
-					used = v
-				}
-				if v, ok := capInfo["cap_used"].(float64); ok {
-					used = v
-				}
+				total, used := float64(0), float64(0)
+				if v, ok := capInfo["total"].(float64); ok { total = v }
+				if v, ok := capInfo["total_capacity"].(float64); ok { total = v }
+				if v, ok := capInfo["cap_total"].(float64); ok { total = v }
+				if v, ok := capInfo["used"].(float64); ok { used = v }
+				if v, ok := capInfo["use_capacity"].(float64); ok { used = v }
+				if v, ok := capInfo["cap_used"].(float64); ok { used = v }
 
 				if total > 0 {
 					q.account.CapacityTotal = int64(total)
@@ -291,43 +276,19 @@ func (q *Quark) GetInfo(ctx context.Context) (*db.Account, error) {
 					vipFetched = true
 				}
 
-				// 2. 提取 VIP 等级
 				if mt, ok := resNode["member_type"]; ok {
-					vipMap := map[string]string{
-						"NORMAL":    "普通用户",
-						"EXP_SVIP":  "88VIP",
-						"SUPER_VIP": "SVIP",
-						"Z_VIP":     "SVIP+",
-					}
-
+					vipMap := map[string]string{"NORMAL": "普通用户", "EXP_SVIP": "88VIP", "SUPER_VIP": "SVIP", "Z_VIP": "SVIP+"}
 					switch v := mt.(type) {
 					case string:
-						if name, ok := vipMap[v]; ok {
-							q.account.VipName = name
-						} else {
-							level, _ := strconv.Atoi(v)
-							if level == 0 {
-								q.account.VipName = "普通用户"
-							} else if level == 1 {
-								q.account.VipName = "VIP"
-							} else if level == 2 {
-								q.account.VipName = "SVIP"
-							}
-						}
+						if name, ok := vipMap[v]; ok { q.account.VipName = name }
 					case float64:
-						level := int(v)
-						if level == 0 {
-							q.account.VipName = "普通用户"
-						} else if level == 1 {
-							q.account.VipName = "VIP"
-						} else if level == 2 {
-							q.account.VipName = "SVIP"
-						}
+						if v == 0 { q.account.VipName = "普通用户" } else if v == 1 { q.account.VipName = "VIP" } else if v == 2 { q.account.VipName = "SVIP" }
 					}
 				}
 
 				if vipFetched {
-					break // 成功获取，退出探测
+					log.Printf("[Quark] 容量信息 (Web): Total=%.2fGB, Used=%.2fGB", total/1024/1024/1024, used/1024/1024/1024)
+					break
 				}
 			}
 		}
@@ -345,6 +306,7 @@ func (q *Quark) ListFiles(ctx context.Context, parentID string) ([]core.FileInfo
 	if parentID == "" || parentID == "/" {
 		parentID = "0"
 	}
+	log.Printf("[Quark] 正在列出目录文件: FID=%s", parentID)
 	apiURL := BaseURL + "/1/clouddrive/file/sort"
 	query := url.Values{}
 	query.Set("pdir_fid", parentID)
@@ -358,11 +320,9 @@ func (q *Quark) ListFiles(ctx context.Context, parentID string) ([]core.FileInfo
 
 	resp, err := q.doRequest(ctx, "GET", apiURL, query, nil, false)
 	if err != nil {
+		log.Printf("[Quark] 列出目录请求失败: %v", err)
 		return nil, err
 	}
-
-	// DEBUG: 打印原始响应
-	// fmt.Printf("DEBUG: Quark ListFiles raw: %s\n", string(resp))
 
 	var res struct {
 		Code interface{} `json:"code"`
@@ -376,6 +336,7 @@ func (q *Quark) ListFiles(ctx context.Context, parentID string) ([]core.FileInfo
 
 	codeStr := fmt.Sprintf("%v", res.Code)
 	if codeStr != "0" && codeStr != "0.0" {
+		log.Printf("[Quark] 列出目录接口返回错误: %v", res.Code)
 		return nil, fmt.Errorf("Quark API error: %v", res.Code)
 	}
 
@@ -398,6 +359,7 @@ func (q *Quark) ListFiles(ctx context.Context, parentID string) ([]core.FileInfo
 			UpdateTime: updateTime,
 		})
 	}
+	log.Printf("[Quark] 目录列出完成: FID=%s, 发现 %d 个项", parentID, len(files))
 	return files, nil
 }
 
@@ -405,6 +367,7 @@ func (q *Quark) CreateFolder(ctx context.Context, parentID, name string) (*core.
 	if parentID == "" || parentID == "/" {
 		parentID = "0"
 	}
+	log.Printf("[Quark] 正在创建文件夹: Name=%s, ParentFID=%s", name, parentID)
 	apiURL := BaseURL + "/1/clouddrive/file"
 	query := url.Values{}
 	query.Set("pr", "ucpro")
@@ -418,14 +381,13 @@ func (q *Quark) CreateFolder(ctx context.Context, parentID, name string) (*core.
 	jsonBody, _ := json.Marshal(body)
 	resp, err := q.doRequest(ctx, "POST", apiURL, query, strings.NewReader(string(jsonBody)), false)
 	if err != nil {
+		log.Printf("[Quark] 创建文件夹请求失败: %v", err)
 		return nil, err
 	}
 
 	var res struct {
 		Code interface{} `json:"code"`
-		Data struct {
-			Fid string `json:"fid"`
-		} `json:"data"`
+		Data struct { Fid string `json:"fid"` } `json:"data"`
 	}
 	if err := json.Unmarshal(resp, &res); err != nil {
 		return nil, err
@@ -433,8 +395,10 @@ func (q *Quark) CreateFolder(ctx context.Context, parentID, name string) (*core.
 
 	codeStr := fmt.Sprintf("%v", res.Code)
 	if codeStr != "0" && codeStr != "0.0" {
+		log.Printf("[Quark] 创建文件夹接口返回错误: %v", res.Code)
 		return nil, fmt.Errorf("Quark API error: %v", res.Code)
 	}
+	log.Printf("[Quark] 文件夹创建成功: %s (FID: %s)", name, res.Data.Fid)
 	return &core.FileInfo{
 		ID:       res.Data.Fid,
 		Name:     name,
@@ -444,6 +408,7 @@ func (q *Quark) CreateFolder(ctx context.Context, parentID, name string) (*core.
 }
 
 func (q *Quark) DeleteFile(ctx context.Context, fileID string) error {
+	log.Printf("[Quark] 正在删除文件: FID=%s", fileID)
 	apiURL := BaseURL + "/1/clouddrive/file/delete"
 	body := map[string]interface{}{
 		"action_type":  2,
@@ -468,34 +433,28 @@ func (q *Quark) getStoken(ctx context.Context, pwdID, extractCode string) (strin
 	}
 	var tokenRes struct {
 		Code interface{} `json:"code"`
-		Data struct {
-			Stoken string `json:"stoken"`
-		} `json:"data"`
+		Data struct { Stoken string `json:"stoken"` } `json:"data"`
 	}
 	if err := json.Unmarshal(resp, &tokenRes); err != nil {
 		return "", err
 	}
 	codeStr := fmt.Sprintf("%v", tokenRes.Code)
 	if codeStr != "0" && codeStr != "0.0" {
+		log.Printf("[Quark] 获取 Stoken 失败: %v", tokenRes.Code)
 		return "", fmt.Errorf("Quark token error: %v", tokenRes.Code)
 	}
 	return tokenRes.Data.Stoken, nil
 }
 
 func (q *Quark) extractShareParams(shareURL string) (pwdID, pdirFID string) {
-	// 提取 pwdID
 	reID := regexp.MustCompile(`/s/(\w+)`)
 	if match := reID.FindStringSubmatch(shareURL); len(match) >= 2 {
 		pwdID = match[1]
 	}
-
-	// 提取 pdirFID (32位十六进制字符串)
-	// 格式通常为 .../share/FID 或 .../share/FID-名称
 	reFID := regexp.MustCompile(`/share/([a-fA-F0-9]{32})`)
 	if match := reFID.FindStringSubmatch(shareURL); len(match) >= 2 {
 		pdirFID = match[1]
 	}
-
 	if pdirFID == "" {
 		pdirFID = "0"
 	}
@@ -508,8 +467,11 @@ func (q *Quark) ParseShare(ctx context.Context, shareURL, extractCode string) ([
 		return nil, fmt.Errorf("invalid quark share url: %s", shareURL)
 	}
 
+	log.Printf("[Quark] 正在解析分享链接: pwdID=%s, pdirFID=%s", pwdID, pdirFID)
+
 	stoken, err := q.getStoken(ctx, pwdID, extractCode)
 	if err != nil {
+		log.Printf("[Quark] 解析分享链接失败 (Stoken获取失败): %v", err)
 		return nil, err
 	}
 
@@ -527,8 +489,12 @@ func (q *Quark) ParseShare(ctx context.Context, shareURL, extractCode string) ([
 	detailQuery.Set("_sort", "file_type:asc,updated_at:desc")
 	resp, err := q.doRequest(ctx, "GET", detailURL, detailQuery, nil, true)
 	if err != nil {
+		log.Printf("[Quark] 解析分享链接失败 (详情请求失败): %v", err)
 		return nil, err
 	}
+
+	log.Printf("[Quark Debug] ParseShare 详情原始响应: %s", string(resp))
+
 	var detailRes struct {
 		Data struct {
 			List []struct {
@@ -549,7 +515,7 @@ func (q *Quark) ParseShare(ctx context.Context, shareURL, extractCode string) ([
 	for _, item := range detailRes.Data.List {
 		updateTime := time.Unix(item.UpdateAt/1000, 0)
 		files = append(files, core.FileInfo{
-			ID:         item.Fid, // 关键修复：仅使用稳定的 Fid 作为 ID
+			ID:         item.Fid,
 			Name:       item.FileName,
 			IsFolder:   item.Dir,
 			Size:       item.Size,
@@ -557,16 +523,11 @@ func (q *Quark) ParseShare(ctx context.Context, shareURL, extractCode string) ([
 			UpdateTime: updateTime,
 		})
 	}
+	log.Printf("[Quark] 解析分享完成: 发现 %d 个项", len(files))
 	return files, nil
-	}
-
+}
 
 func (q *Quark) SaveFileTo(ctx context.Context, fileID, targetPath string) error {
-	_ = ctx
-	_ = fileID
-	_ = targetPath
-	// 夸克传过来的预览 ID 格式是 "fid|token|stoken"
-	// ... 在实际 Worker 中，如果是 Quark，由于 API 限制，建议仍使用 SaveLink 进行批量保存
 	return fmt.Errorf("quark driver prefers batch SaveLink operation")
 }
 
@@ -576,8 +537,11 @@ func (q *Quark) SaveLink(ctx context.Context, shareURL, extractCode, targetPath 
 		return fmt.Errorf("invalid quark share url: %s", shareURL)
 	}
 
+	log.Printf("[Quark] 正在提交转存任务: pwdID=%s, targetPath=%s", pwdID, targetPath)
+
 	stoken, err := q.getStoken(ctx, pwdID, extractCode)
 	if err != nil {
+		log.Printf("[Quark] 转存失败 (Stoken获取失败): %v", err)
 		return err
 	}
 
@@ -588,11 +552,8 @@ func (q *Quark) SaveLink(ctx context.Context, shareURL, extractCode, targetPath 
 	detailQuery.Set("pdir_fid", pdirFID)
 	detailQuery.Set("pr", "ucpro")
 	detailQuery.Set("fr", "pc")
-	detailQuery.Set("force", "0")
 	detailQuery.Set("_page", "1")
 	detailQuery.Set("_size", "100")
-	detailQuery.Set("_fetch_total", "1")
-	detailQuery.Set("_sort", "file_type:asc,updated_at:desc")
 	resp, err := q.doRequest(ctx, "GET", detailURL, detailQuery, nil, true)
 	if err != nil {
 		return err
@@ -609,12 +570,12 @@ func (q *Quark) SaveLink(ctx context.Context, shareURL, extractCode, targetPath 
 
 	targetID, err := q.prepareTargetPath(ctx, targetPath)
 	if err != nil {
+		log.Printf("[Quark] 转存失败 (准备目标路径失败): %v", err)
 		return err
 	}
 
 	idMap := make(map[string]bool)
 	for _, id := range fileIDs {
-		// 夸克传过来的预览 ID 格式是 "fid|token|stoken"
 		parts := strings.Split(id, "|")
 		idMap[parts[0]] = true
 	}
@@ -629,27 +590,23 @@ func (q *Quark) SaveLink(ctx context.Context, shareURL, extractCode, targetPath 
 	}
 
 	if len(fids) == 0 {
+		log.Printf("[Quark] 转存取消: 未发现匹配的文件 FID")
 		return nil
 	}
 
 	saveURL := BaseURL + "/1/clouddrive/share/sharepage/save"
-	saveQuery := url.Values{}
-	saveQuery.Set("__t", strconv.FormatInt(time.Now().UnixMilli(), 10))
-	saveQuery.Set("__dt", strconv.FormatInt(time.Now().UnixMilli()+123, 10))
-	saveQuery.Set("uc_param_str", "")
-
 	saveBody := map[string]interface{}{
-		"fid_list":       fids,
-		"fid_token_list": tokens,
-		"to_pdir_fid":    targetID,
-		"pwd_id":         pwdID,
-		"stoken":         stoken,
-		"pdir_fid":       pdirFID,
-		"scene":          "link",
+		"fid_list": fids, "fid_token_list": tokens, "to_pdir_fid": targetID,
+		"pwd_id": pwdID, "stoken": stoken, "pdir_fid": pdirFID, "scene": "link",
 	}
 	jsonSave, _ := json.Marshal(saveBody)
-	_, err = q.doRequest(ctx, "POST", saveURL, saveQuery, strings.NewReader(string(jsonSave)), true)
-	return err
+	_, err = q.doRequest(ctx, "POST", saveURL, nil, strings.NewReader(string(jsonSave)), true)
+	if err != nil {
+		log.Printf("[Quark] 转存执行异常: %v", err)
+		return err
+	}
+	log.Printf("[Quark] 转存成功: 已保存 %d 个项至 FID=%s", len(fids), targetID)
+	return nil
 }
 
 func (q *Quark) prepareTargetPath(ctx context.Context, path string) (string, error) {
