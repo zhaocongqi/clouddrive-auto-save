@@ -35,14 +35,18 @@ func previewTask(c *gin.Context) {
 		return
 	}
 
+	log.Printf("[API] 正在预览任务重命名结果: TaskName=%s, ShareURL=%s", req.Name, req.ShareURL)
+
 	var account db.Account
 	if err := db.DB.First(&account, req.AccountID).Error; err != nil {
+		log.Printf("[API] 预览失败: 账号未找到 (ID: %d)", req.AccountID)
 		c.JSON(http.StatusNotFound, gin.H{"error": "account not found"})
 		return
 	}
 
 	driver := core.GetDriver(&account)
 	if driver == nil {
+		log.Printf("[API] 预览失败: 驱动加载失败 (Platform: %s)", account.Platform)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "driver not found"})
 		return
 	}
@@ -50,6 +54,7 @@ func previewTask(c *gin.Context) {
 	ctx := c.Request.Context()
 	files, err := driver.ParseShare(ctx, req.ShareURL, req.ExtractCode)
 	if err != nil {
+		log.Printf("[API] 预览解析异常: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -95,6 +100,7 @@ func previewTask(c *gin.Context) {
 		results = append(results, res)
 	}
 
+	log.Printf("[API] 预览计算完成: 处理了 %d 个文件", len(results))
 	c.JSON(http.StatusOK, results)
 }
 
