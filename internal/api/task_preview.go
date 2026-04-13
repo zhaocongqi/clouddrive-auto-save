@@ -5,6 +5,7 @@ import (
 	"github.com/zcq/clouddrive-auto-save/internal/core"
 	"github.com/zcq/clouddrive-auto-save/internal/core/renamer"
 	"github.com/zcq/clouddrive-auto-save/internal/db"
+	"log"
 	"net/http"
 	"regexp"
 	"time"
@@ -109,14 +110,18 @@ func parseShareLinkInfo(c *gin.Context) {
 		return
 	}
 
+	log.Printf("[API] 正在解析分享链接: %s (AccountID: %d)", req.ShareURL, req.AccountID)
+
 	var account db.Account
 	if err := db.DB.First(&account, req.AccountID).Error; err != nil {
+		log.Printf("[API] 解析失败: 账号未找到 (ID: %d)", req.AccountID)
 		c.JSON(http.StatusNotFound, gin.H{"error": "account not found"})
 		return
 	}
 
 	driver := core.GetDriver(&account)
 	if driver == nil {
+		log.Printf("[API] 解析失败: 驱动加载失败 (Platform: %s)", account.Platform)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "driver not found"})
 		return
 	}
@@ -124,9 +129,11 @@ func parseShareLinkInfo(c *gin.Context) {
 	ctx := c.Request.Context()
 	files, err := driver.ParseShare(ctx, req.ShareURL, req.ExtractCode)
 	if err != nil {
+		log.Printf("[API] 解析异常: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
+	log.Printf("[API] 解析完成: 发现 %d 个文件/文件夹", len(files))
 	c.JSON(http.StatusOK, files)
 }
