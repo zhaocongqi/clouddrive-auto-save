@@ -281,15 +281,19 @@ const handleCheck = async (row) => {
 }
 
 const handleDelete = (row) => {
-  ElMessageBox.confirm('确定要删除该账号吗？关联的任务可能无法执行。', '警告', {
+  ElMessageBox.confirm('确定要删除该账号吗？只有在没有关联任务的情况下才能成功删除。', '删除账号', {
     confirmButtonText: '确定',
     cancelButtonText: '取消',
     type: 'warning'
   }).then(async () => {
-    await deleteAccount(row.id)
-    ElMessage.success('已删除')
-    fetchList()
-  })
+    try {
+      await deleteAccount(row.id)
+      ElMessage.success('已删除')
+      fetchList()
+    } catch (err) {
+      // API 请求失败（例如存在关联任务），拦截器已统一抛出提示，此处静默捕获即可。
+    }
+  }).catch(() => {})
 }
 
 const formatTime = (timeStr) => {
