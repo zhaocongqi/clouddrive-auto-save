@@ -310,6 +310,7 @@ const tempStartFileId = ref('')
 
 // 独立目录弹窗相关
 const folderDialogVisible = ref(false)
+const loadingFolders = ref(false)
 const folderTreeRef = ref(null)
 const selectedTreePath = ref('')
 const newFolderName = ref('')
