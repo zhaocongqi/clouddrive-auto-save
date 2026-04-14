@@ -1,6 +1,8 @@
 package api
 
 import (
+	"context"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/zcq/clouddrive-auto-save/internal/core"
 	_ "github.com/zcq/clouddrive-auto-save/internal/core/cloud139"
@@ -53,6 +55,36 @@ func InitRouter(wm *worker.Manager) *gin.Engine {
 	return r
 }
 
+func performAccountCheck(account *db.Account, ctx context.Context) error {
+	driver := core.GetDriver(account)
+	if driver == nil {
+		return fmt.Errorf("driver not found for platform: %s", account.Platform)
+	}
+
+	updatedAccount, err := driver.GetInfo(ctx)
+	if err != nil {
+		account.Status = 0
+		db.DB.Model(account).Update("status", 0)
+		return err
+	}
+
+	err = db.DB.Model(account).Updates(map[string]interface{}{
+		"nickname":       updatedAccount.Nickname,
+		"account_name":   updatedAccount.AccountName,
+		"status":         1,
+		"capacity_used":  updatedAccount.CapacityUsed,
+		"capacity_total": updatedAccount.CapacityTotal,
+		"vip_name":       updatedAccount.VipName,
+		"last_check":     time.Now(),
+	}).Error
+	if err != nil {
+		return err
+	}
+
+	// 重新加载完整信息
+	return db.DB.First(account, account.ID).Error
+}
+
 func checkAccount(c *gin.Context) {
 	id := c.Param("id")
 	var account db.Account
@@ -62,30 +94,11 @@ func checkAccount(c *gin.Context) {
 		return
 	}
 
-	driver := core.GetDriver(&account)
-	if driver == nil {
-		c.PureJSON(http.StatusInternalServerError, gin.H{"error": "driver not found"})
+	if err := performAccountCheck(&account, c.Request.Context()); err != nil {
+		log.Printf("[API] 账号校验失败: %v", err)
+		c.PureJSON(http.StatusUnauthorized, gin.H{"error": err.Error(), "account": account})
 		return
 	}
-
-	ctx := c.Request.Context()
-	updatedAccount, err := driver.GetInfo(ctx)
-	if err != nil {
-		account.Status = 0
-		db.DB.Save(&account)
-		c.PureJSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
-		return
-	}
-
-	db.DB.Model(&account).Updates(map[string]interface{}{
-		"nickname":       updatedAccount.Nickname,
-		"account_name":   updatedAccount.AccountName,
-		"status":         1,
-		"capacity_used":  updatedAccount.CapacityUsed,
-		"capacity_total": updatedAccount.CapacityTotal,
-		"vip_name":       updatedAccount.VipName,
-		"last_check":     time.Now(),
-	})
 
 	c.PureJSON(http.StatusOK, account)
 }
@@ -103,7 +116,16 @@ func createAccount(c *gin.Context) {
 		return
 	}
 	log.Printf("[API] 添加账号: %s (%s)", account.AccountName, account.Platform)
-	db.DB.Create(&account)
+	if err := db.DB.Create(&account).Error; err != nil {
+		c.PureJSON(http.StatusInternalServerError, gin.H{"error": "failed to create account"})
+		return
+	}
+
+	// 自动执行一次校验
+	if err := performAccountCheck(&account, c.Request.Context()); err != nil {
+		log.Printf("[API] 账号自动校验失败: %v", err)
+	}
+
 	c.PureJSON(http.StatusOK, account)
 }
 
@@ -119,7 +141,16 @@ func updateAccount(c *gin.Context) {
 		return
 	}
 	log.Printf("[API] 更新账号: %s", account.AccountName)
-	db.DB.Save(&account)
+	if err := db.DB.Save(&account).Error; err != nil {
+		c.PureJSON(http.StatusInternalServerError, gin.H{"error": "failed to update account"})
+		return
+	}
+
+	// 自动执行一次校验
+	if err := performAccountCheck(&account, c.Request.Context()); err != nil {
+		log.Printf("[API] 账号自动校验失败: %v", err)
+	}
+
 	c.PureJSON(http.StatusOK, account)
 }
 
