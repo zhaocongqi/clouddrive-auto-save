@@ -34,3 +34,23 @@
   ]
 }
 ```
+
+---
+
+## 2. 获取实时系统日志 (SSE)
+建立 Server-Sent Events 连接，实时获取网盘 API 请求与响应日志。
+
+- **URL**: `/dashboard/logs`
+- **Method**: `GET`
+- **Headers**: `Accept: text/event-stream`
+- **Response**: `EventStream`
+    - **Event: `message`**: 包含格式化的日志文本。
+
+---
+
+## 3. 获取近期日志历史
+获取内存中缓存的最近若干条日志记录。
+
+- **URL**: `/dashboard/logs/recent`
+- **Method**: `GET`
+- **Response**: `Array<string>`

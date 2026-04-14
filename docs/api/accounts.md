@@ -14,8 +14,8 @@
 | `platform` | string | `139` 或 `quark` |
 | `nickname` | string | 云盘真实昵称 |
 | `vip_name` | string | 会员等级（如：白银会员、SVIP） |
-| `capacity_used`| int64 | 已用容量 (Bytes) |
-| `capacity_total`| int64 | 总容量 (Bytes) |
+| `capacity_used`| int64 | 已用容量 (Bytes) <br>*(139 仅计个人空间)* |
+| `capacity_total`| int64 | 总容量 (Bytes) <br>*(139 含个人+家庭空间)* |
 | `status` | int | 状态 (1:正常, 0:失效) |
 | `last_check` | string | 最后一次校验的时间戳 |
 
@@ -55,6 +55,18 @@
     - `401 Unauthorized`: 登录凭证失效（如 Token 过期），Body 中包含 `{"error": "登录已失效 (Token Invalid)"}`。
     - `404 Not Found`: 账号不存在。
     - `500 Internal Server Error`: 驱动加载失败或系统内部错误。
+
+---
+
+## 5. 删除账号
+从系统中移除指定的云盘账号。
+
+- **URL**: `/accounts/:id`
+- **Method**: `DELETE`
+- **Success Response**: `200 OK`
+- **Errors**:
+    - `409 Conflict`: 账号当前有关联的任务。Body: `{"error": "该账号有关联的 X 个任务，请先删除任务"}`。
+    - `404 Not Found`: 账号不存在。
 
 ---
 

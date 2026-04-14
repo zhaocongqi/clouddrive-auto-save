@@ -142,3 +142,22 @@
 - **查询异步任务 (task)**: 
   - `GET /1/clouddrive/task`
   - 参数: `task_id`。状态 `2` 表示成功。
+
+---
+
+## 3. 接口监控与排错 (Diagnostics)
+
+本项目所有网盘接口请求均通过 `internal/core/cloud*` 下的底层客户端发出。
+
+### 3.1 响应日志广播
+为了方便排错，系统在底层 `doRequest` 逻辑中统一拦截了原始 JSON 响应。
+- **广播机制**: 使用 `utils.GlobalBroadcaster.Broadcast` 将原始响应体（Body）实时推送。
+- **UI 展示**: 在 Web 后端 Dashboard 的“实时日志”栏目中，通过 SSE (`/api/dashboard/logs`) 实时监听并格式化展示。
+- **关键日志标识**:
+  - `[139 Debug]`: 移动云盘接口日志。
+  - `[Quark Debug]`: 夸克网盘接口日志。
+
+### 3.2 常见错误诊断
+- **139 (HCY)**: 若响应包含 `05050009`，通常意味着 `Authorization` 头部失效，需重新抓包。
+- **Quark**: 若响应包含 `401 Unauthorized` 或 `need login`，则 Cookie 已失效。
+- **容量异常**: 139 家庭空间容量若计算不准，请参考 `client.go` 中的累加逻辑，目前系统仅计个人空间已用容量。
