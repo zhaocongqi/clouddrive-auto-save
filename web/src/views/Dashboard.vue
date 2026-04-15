@@ -67,7 +67,7 @@
               </div>
               <div class="header-actions">
                 <el-tooltip content="清空日志" placement="top">
-                  <el-button link :icon="Trash2" @click="clearLogs" />
+                  <el-button link type="danger" :icon="Trash2" @click="clearLogs" />
                 </el-tooltip>
               </div>
             </div>
