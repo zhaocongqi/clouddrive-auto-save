@@ -277,7 +277,17 @@ func (c *Cloud139) GetInfo(ctx context.Context) (*db.Account, error) {
 		data = resRaw
 	}
 
-	nickname, _ := data["userName"].(string)
+	auditNickName, _ := data["auditNickName"].(string)
+	userName, _ := data["userName"].(string)
+
+	var nickname string
+	if auditNickName == "" && strings.Contains(userName, "*") {
+		// 用户未修改昵称且 userName 被脱敏，直接尝试使用 phoneNumber
+		nickname, _ = data["phoneNumber"].(string)
+	} else {
+		nickname = userName
+	}
+
 	if nickname == "" {
 		nickname, _ = data["nickName"].(string)
 	}

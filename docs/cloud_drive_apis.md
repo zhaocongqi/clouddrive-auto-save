@@ -26,6 +26,7 @@
   - `POST /user/getUser` (User Host)
   - **重要返回结构**:
     - `userDomainId`: 用户核心标识（容量查询必填）。
+    - `auditNickName`: 审核通过的昵称。未手动修改时为 null。结合 `userName` 可判断是否为默认的脱敏手机号。
     - `userProfileInfo.userName`: 最新的昵称字段所在路径。
     - `auth.memberLevel`: 部分版本在此处返回会员等级。
     - `loginName / account / msisdn / phoneNumber`: 用户的真实手机号。
