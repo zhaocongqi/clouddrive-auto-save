@@ -167,6 +167,7 @@
           :load="loadFolders"
           :props="{ label: 'label', isLeaf: 'isLeaf' }"
           node-key="path"
+          :default-expanded-keys="['/']"
           highlight-current
           @current-change="handleTreeCurrentChange"
           :expand-on-click-node="false"
@@ -313,6 +314,7 @@ const folderDialogVisible = ref(false)
 const loadingFolders = ref(false)
 const folderTreeRef = ref(null)
 const selectedTreePath = ref('')
+const selectedTreeId = ref('')
 const newFolderName = ref('')
 const creatingFolder = ref(false)
 
@@ -417,10 +419,17 @@ const loadFolders = async (node, resolve) => {
     return resolve([])
   }
   
-  const parentID = node.level === 0 ? '' : node.data.id
-  const parentPath = node.level === 0 ? '/' : node.data.path
-  
+  // 0层：直接返回虚拟根节点
   if (node.level === 0) {
+    pathIdMap.value['/'] = '' // 确保映射表里有根节点的合法记录
+    return resolve([{ label: '根目录', path: '/', id: '', isLeaf: false }])
+  }
+
+  // 1层及以上：使用父节点（虚拟根或真实目录）的属性请求后端
+  const parentID = node.data.id
+  const parentPath = node.data.path
+  
+  if (node.level === 1) {
     loadingFolders.value = true
   }
   try {
@@ -433,7 +442,7 @@ const loadFolders = async (node, resolve) => {
     console.error('加载目录失败:', err)
     resolve([])
   } finally {
-    if (node.level === 0) {
+    if (node.level === 1) {
       loadingFolders.value = false
     }
   }
@@ -446,27 +455,25 @@ const handleInlineCreateFolder = async () => {
   }
   
   const currentPath = selectedTreePath.value || '/'
-  const currentID = pathIdMap.value[currentPath]
-
-  if (currentID === undefined) {
-    return ElMessage.warning('无法确定当前选中目录的 ID，请重新展开该节点')
-  }
+  // 从选中状态取 ID，若为空则默认取虚拟根节点的空字符串 ''
+  const currentID = selectedTreeId.value || '' 
 
   creatingFolder.value = true
   try {
     const res = await createFolder(form.value.account_id, currentID, currentPath, newFolderName.value.trim())
     ElMessage.success('文件夹创建成功')
     pathIdMap.value[res.path] = res.id
+    
     if (folderTreeRef.value) {
+      // 由于存在虚拟根节点，getNode 一定能找到有效的父节点（包括 '/'）
       const currentNode = folderTreeRef.value.getNode(currentPath)
       if (currentNode) {
         folderTreeRef.value.append(res, currentNode)
         currentNode.expanded = true
       }
-    }
-    selectedTreePath.value = res.path
-    if (folderTreeRef.value) {
-       folderTreeRef.value.setCurrentKey(res.path)
+      selectedTreePath.value = res.path
+      selectedTreeId.value = res.id
+      folderTreeRef.value.setCurrentKey(res.path)
     }
     newFolderName.value = ''
   } catch (err) {
@@ -507,13 +514,19 @@ const openFolderDialog = () => {
     return ElMessage.warning('请先选择执行账号')
   }
   loadingFolders.value = true
-  selectedTreePath.value = form.value.save_path || '/'
+  const initialPath = form.value.save_path || '/'
+  selectedTreePath.value = initialPath
+  // 尝试从映射表中恢复 ID，若是根目录则默认为空字符串
+  selectedTreeId.value = pathIdMap.value[initialPath] || (initialPath === '/' ? '' : '')
   newFolderName.value = ''
   folderDialogVisible.value = true
 }
 
 const handleTreeCurrentChange = (data) => {
-  selectedTreePath.value = data.path
+  if (data) {
+    selectedTreePath.value = data.path
+    selectedTreeId.value = data.id
+  }
 }
 
 const confirmFolderSelection = () => {
