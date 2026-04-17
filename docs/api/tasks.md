@@ -77,7 +77,7 @@
 ---
 
 ## 7. 解析分享链接详情
-仅用于拉取分享链接内的文件列表，供用户在 UI 中选择起始转存点。
+仅用于拉取分享链接内的文件列表，供用户在 UI 中选择起始转存点。**此接口已支持重命名预览及同名预检。**
 
 - **URL**: `/tasks/parse_share`
 - **Method**: `POST`
@@ -87,5 +87,20 @@
 | `account_id` | uint | 关联的账号 ID |
 | `share_url` | string | 待解析的分享链接 |
 | `extract_code`| string | 提取码 |
+| `save_path` | string | 预期的保存路径（用于执行同名检查） |
+| `pattern` | string | 正则表达式（用于重命名预览） |
+| `replacement` | string | 替换规则 |
+| `name` | string | 任务名称 |
 
-- **Response**: `Array<FileInfo>` (包含文件名、ID、更新时间等)
+- **Response**: `Array<FileInfo>`
+
+### FileInfo 结构说明 (含增强字段)
+| 字段 | 类型 | 说明 |
+| :--- | :--- | :--- |
+| `id` | string | 文件 ID |
+| `name` | string | 原始文件名 |
+| `new_name` | string | **[增强]** 经过重命名规则处理后的预览名 |
+| `is_existed` | bool | **[增强]** 此文件（基于新名）是否已存在于目标路径中 |
+| `is_folder` | bool | 是否为文件夹 |
+| `size` | int64 | 文件大小 |
+| `updated_at` | string | 更新时间 |
