@@ -30,7 +30,20 @@
         
         <el-table-column label="状态" width="120">
           <template #default="{ row }">
-            <el-tag :type="getStatusType(row.status)">
+            <el-tooltip
+              v-if="row.message && row.message.includes('[Fatal]')"
+              :content="row.message"
+              placement="top"
+              effect="dark"
+            >
+              <el-tag type="danger" style="cursor: help">
+                <div class="status-inner">
+                  <el-icon><AlertTriangle /></el-icon>
+                  LINK ERROR
+                </div>
+              </el-tag>
+            </el-tooltip>
+            <el-tag v-else :type="getStatusType(row.status)">
               <div class="status-inner">
                 <el-icon v-if="row.status === 'running'" class="icon-spin"><RefreshCw /></el-icon>
                 {{ row.status.toUpperCase() }}
@@ -103,7 +116,16 @@
         </el-row>
 
         <el-form-item label="分享链接" required>
-          <el-input v-model="form.share_url" placeholder="请输入 139 或 Quark 分享链接" @change="handleUrlChange" />
+          <el-input v-model="form.share_url" placeholder="请输入 139 或 Quark 分享链接" @change="handleUrlChange">
+            <template #append>
+              <el-button 
+                :icon="ExternalLink" 
+                title="在新标签页中打开链接"
+                :disabled="!form.share_url"
+                @click="openExternalLink(form.share_url)"
+              />
+            </template>
+          </el-input>
         </el-form-item>
 
         <el-row :gutter="20">
@@ -330,7 +352,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, computed } from 'vue'
-import { Plus, Play, Edit, Trash2, RefreshCw, Folder, File, Info, Cloud } from 'lucide-vue-next'
+import { Plus, Play, Edit, Trash2, RefreshCw, Folder, File, Info, Cloud, ExternalLink, AlertTriangle } from 'lucide-vue-next'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getTasks, createTask, updateTask, deleteTask, runTask, previewTask, parseShareLink } from '../api/task'
 import { getAccounts, getFolders, createFolder } from '../api/account'
@@ -426,6 +448,12 @@ const handleUrlChange = () => {
   form.value.start_file_id = ''
   form.value.start_file_name = ''
   selectedStartFileName.value = ''
+}
+
+const openExternalLink = (url) => {
+  if (url) {
+    window.open(url, '_blank')
+  }
 }
 
 // 手动打开解析起始文件的对话框
