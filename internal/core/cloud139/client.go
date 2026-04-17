@@ -666,7 +666,7 @@ func (c *Cloud139) ParseShare(ctx context.Context, shareURL, extractCode string)
 
 				var updateTime time.Time
 				if len(udTime) == 14 {
-					updateTime, _ = time.ParseInLocation("2006-01-02 15:04:05", udTime, cst)
+					updateTime, _ = time.ParseInLocation("20060102150405", udTime, cst)
 				}
 
 				if path == "" {
@@ -711,7 +711,7 @@ func (c *Cloud139) SaveLink(ctx context.Context, shareURL, extractCode, targetPa
 		return err
 	}
 
-	targetID, err := c.prepareTargetPath(ctx, targetPath)
+	targetID, err := c.PrepareTargetPath(ctx, targetPath)
 	if err != nil {
 		return err
 	}
@@ -908,7 +908,7 @@ func (c *Cloud139) getShareInfo(ctx context.Context, linkID, passwd, pCaID strin
 	return res, nil
 }
 
-func (c *Cloud139) prepareTargetPath(ctx context.Context, path string) (string, error) {
+func (c *Cloud139) PrepareTargetPath(ctx context.Context, path string) (string, error) {
 	if path == "" || path == "/" {
 		return "root", nil
 	}
