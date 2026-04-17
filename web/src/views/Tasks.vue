@@ -227,18 +227,18 @@
     <el-dialog 
       v-model="startFileDialogVisible" 
       title="选择起始转存文件" 
-      width="700px"
+      width="900px"
       append-to-body
       destroy-on-close
     >
       <div class="share-files-dialog-content">
         <el-alert title="逻辑说明" type="info" :closable="false" show-icon style="margin-bottom: 15px">
-          系统将从选中的文件开始，按更新时间向前转存所有更新的文件（含所选文件本身）。
+          系统将从选中的文件开始，按更新时间向前转存所有更新的文件（含所选文件本身）。<b>此处已应用您的重命名规则并执行同名预检。</b>
         </el-alert>
         
         <el-table 
           :data="shareFiles" 
-          max-height="400" 
+          max-height="500" 
           size="default" 
           border 
           stripe 
@@ -247,36 +247,51 @@
           :row-class-name="tableRowClassName"
           @current-change="handleStartFileTableChange"
         >
-          <el-table-column width="55" align="center">
+          <el-table-column width="40" align="center">
             <template #default="{ row }">
-              <el-radio v-model="tempStartFileId" :label="row.id">&nbsp;</el-radio>
+              <el-radio v-model="tempStartFileId" :label="row.id" class="naked-radio"><span></span></el-radio>
             </template>
           </el-table-column>
-          <el-table-column label="文件名" show-overflow-tooltip min-width="250">
+          
+          <el-table-column label="原始文件名" show-overflow-tooltip min-width="180">
             <template #default="{ row }">
-              <div style="display: flex; align-items: center; gap: 8px">
-                <el-icon size="18">
+              <div class="name-main">
+                <el-icon size="16">
                   <Folder v-if="row.is_folder" color="#eab308" />
                   <File v-else color="#64748b" />
                 </el-icon>
-                <span :style="{ fontWeight: row.is_folder ? '600' : 'normal' }">{{ row.name }}</span>
+                <span>{{ row.name }}</span>
               </div>
             </template>
           </el-table-column>
-          <el-table-column label="类型" width="90" align="center">
+
+          <el-table-column label="预览文件名 (入库名)" show-overflow-tooltip min-width="220">
+            <template #default="{ row }">
+              <span :style="{ 
+                fontWeight: row.is_folder ? '600' : 'normal',
+                color: (row.new_name && row.new_name !== row.name) ? 'var(--el-color-primary)' : 'inherit'
+              }">
+                {{ row.new_name || row.name }}
+              </span>
+            </template>
+          </el-table-column>
+
+          <el-table-column label="类型" width="80" align="center">
             <template #default="{ row }">
               <el-tag size="small" :type="row.is_folder ? 'warning' : 'info'" effect="plain">
-                {{ row.is_folder ? '文件夹' : '文件' }}
+                {{ row.is_folder ? '目录' : '文件' }}
               </el-tag>
             </template>
           </el-table-column>
+          
           <el-table-column label="状态" width="100" align="center">
             <template #default="{ row }">
-              <el-tag v-if="row.is_existed" size="small" type="success" effect="light">已同步</el-tag>
-              <span v-else style="color: #94a3b8; font-size: 12px">-</span>
+              <el-tag v-if="row.is_existed" size="small" type="success" effect="light">已在网盘</el-tag>
+              <el-tag v-else size="small" type="info" effect="plain">待转存</el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="updated_at" label="更新时间" width="170" sortable />
+          
+          <el-table-column prop="updated_at" label="分享更新时间" width="160" sortable />
         </el-table>
       </div>
       <template #footer>
@@ -429,7 +444,10 @@ const openStartFileDialog = async () => {
       account_id: form.value.account_id,
       share_url: form.value.share_url,
       extract_code: form.value.extract_code,
-      save_path: form.value.save_path
+      save_path: form.value.save_path,
+      pattern: form.value.pattern,
+      replacement: form.value.replacement,
+      name: form.value.name
     })
     shareFiles.value = data
     
@@ -883,10 +901,26 @@ html.dark .task-name-cell .name {
   flex-shrink: 0;
 }
 
+.naked-radio :deep(.el-radio__label) {
+  display: none !important;
+}
+
 .custom-tree-node {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.name-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.name-sub-column {
+  font-size: 13px;
+  color: #64748b;
 }
 
 .account-option-item {

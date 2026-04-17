@@ -95,6 +95,9 @@ func parseShareLinkInfo(c *gin.Context) {
 		ShareURL    string `json:"share_url" binding:"required"`
 		ExtractCode string `json:"extract_code"`
 		SavePath    string `json:"save_path"`
+		Pattern     string `json:"pattern"`
+		Replacement string `json:"replacement"`
+		Name        string `json:"name"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -126,7 +129,31 @@ func parseShareLinkInfo(c *gin.Context) {
 		return
 	}
 
-	// 执行同名检查逻辑
+	// 1. 如果有重命名规则，先执行预览重命名
+	if req.Pattern != "" || req.Replacement != "" {
+		renameProc := renamer.NewProcessor()
+		for i := range files {
+			opts := renamer.RenameOptions{
+				TaskName:    req.Name,
+				Pattern:     req.Pattern,
+				Replacement: req.Replacement,
+				FileName:    files[i].Name,
+			}
+			newName, err := renameProc.Process(opts)
+			if err == nil {
+				files[i].NewName = newName
+			} else {
+				files[i].NewName = files[i].Name
+			}
+		}
+	} else {
+		// 默认预览名即原名
+		for i := range files {
+			files[i].NewName = files[i].Name
+		}
+	}
+
+	// 2. 执行同名检查逻辑 (基于预览名进行比对)
 	if req.SavePath != "" && len(files) > 0 {
 		targetID, err := driver.PrepareTargetPath(ctx, req.SavePath)
 		if err == nil {
@@ -137,7 +164,8 @@ func parseShareLinkInfo(c *gin.Context) {
 			}
 
 			for i := range files {
-				if existingMap[files[i].Name] {
+				// 检查重命名后的名字是否已在网盘中
+				if existingMap[files[i].NewName] {
 					files[i].IsExisted = true
 				}
 			}
