@@ -66,12 +66,34 @@
           <el-col :span="12">
             <el-form-item label="执行账号" required>
               <el-select v-model="form.account_id" placeholder="选择账号" style="width: 100%" @change="handleAccountChange">
-                <el-option
-                  v-for="acc in accounts"
-                  :key="acc.id"
-                  :label="`${acc.nickname} (${acc.platform})`"
-                  :value="acc.id"
-                />
+                <el-option-group
+                  v-for="group in groupedAccounts"
+                  :key="group.label"
+                  :label="group.label"
+                >
+                  <el-option
+                    v-for="acc in group.options"
+                    :key="acc.id"
+                    :value="acc.id"
+                    :disabled="acc.status === 0"
+                    :label="acc.nickname"
+                  >
+                    <div class="account-option-item">
+                      <div class="acc-info">
+                        <el-icon class="acc-icon" :color="acc.platform === 'quark' ? '#10b981' : '#f59e0b'">
+                          <Cloud />
+                        </el-icon>
+                        <span class="acc-name">{{ acc.nickname }}</span>
+                      </div>
+                      <div class="acc-meta">
+                        <span class="acc-cap" v-if="acc.capacity_total > 0">
+                          剩余 {{ formatSize(acc.capacity_total - acc.capacity_used) }}
+                        </span>
+                        <el-tag v-if="acc.status === 0" size="small" type="danger" effect="dark">已失效</el-tag>
+                      </div>
+                    </div>
+                  </el-option>
+                </el-option-group>
               </el-select>
             </el-form-item>
           </el-col>
@@ -283,7 +305,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, computed } from 'vue'
-import { Plus, Play, Edit, Trash2, RefreshCw, Folder, File, Info } from 'lucide-vue-next'
+import { Plus, Play, Edit, Trash2, RefreshCw, Folder, File, Info, Cloud } from 'lucide-vue-next'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getTasks, createTask, updateTask, deleteTask, runTask, previewTask, parseShareLink } from '../api/task'
 import { getAccounts, getFolders, createFolder } from '../api/account'
@@ -317,6 +339,29 @@ const selectedTreePath = ref('')
 const selectedTreeId = ref('')
 const newFolderName = ref('')
 const creatingFolder = ref(false)
+
+const formatSize = (bytes) => {
+  if (bytes <= 0) return '0 B'
+  const units = ['B', 'KB', 'MB', 'GB', 'TB']
+  const i = Math.floor(Math.log(bytes) / Math.log(1024))
+  return `${(bytes / Math.pow(1024, i)).toFixed(2)} ${units[i]}`
+}
+
+const groupedAccounts = computed(() => {
+  const groups = [
+    { label: '移动云盘', platform: '139', options: [] },
+    { label: '夸克网盘', platform: 'quark', options: [] }
+  ]
+  
+  accounts.value.forEach(acc => {
+    const group = groups.find(g => g.platform === acc.platform)
+    if (group) {
+      group.options.push(acc)
+    }
+  })
+  
+  return groups.filter(g => g.options.length > 0)
+})
 
 const selectedAccountPlatform = computed(() => {
   if (!form.value.account_id) return ''
@@ -812,5 +857,38 @@ html.dark .task-name-cell .name {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.account-option-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  gap: 12px;
+}
+
+.acc-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.acc-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.acc-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.acc-cap {
+  font-size: 12px;
+  color: #94a3b8;
 }
 </style>
