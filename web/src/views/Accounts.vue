@@ -150,7 +150,7 @@
           </el-card>
         </el-col>
       </el-row>
-      <el-empty v-if="accountList.length === 0" description="暂无账号" />
+      <el-empty v-if="!loading && accountList.length === 0" description="暂无账号" />
     </div>
 
     <!-- 添加账号对话框 -->
@@ -201,7 +201,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { getAccounts, createAccount, updateAccount, deleteAccount, checkAccount } from '../api/account'
 
 const accountList = ref([])
-const loading = ref(false)
+const loading = ref(true)
 const dialogVisible = ref(false)
 const submitting = ref(false)
 const viewMode = ref(localStorage.getItem('accountViewMode') || 'table')
@@ -219,7 +219,7 @@ const accountForm = ref({
 })
 
 const fetchList = async () => {
-  loading.ref = true
+  loading.value = true
   try {
     const res = await getAccounts()
     accountList.value = res
