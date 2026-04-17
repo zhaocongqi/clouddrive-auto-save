@@ -14,10 +14,13 @@
           <template #default="{ row }">
             <div class="task-name-cell">
               <span class="name">{{ row.name }}</span>
-              <div class="account-tag">
+              <div class="account-tag" v-if="row.account">
                 <el-tag size="small" :type="row.account.platform === 'quark' ? 'success' : 'warning'">
                   {{ row.account.nickname || row.account.platform }}
                 </el-tag>
+              </div>
+              <div class="account-tag" v-else>
+                <el-tag size="small" type="danger">账号已移除</el-tag>
               </div>
             </div>
           </template>
@@ -241,6 +244,7 @@
           stripe 
           v-loading="parsingShare"
           highlight-current-row
+          :row-class-name="tableRowClassName"
           @current-change="handleStartFileTableChange"
         >
           <el-table-column width="55" align="center">
@@ -248,7 +252,7 @@
               <el-radio v-model="tempStartFileId" :label="row.id">&nbsp;</el-radio>
             </template>
           </el-table-column>
-          <el-table-column label="文件名" show-overflow-tooltip min-width="200">
+          <el-table-column label="文件名" show-overflow-tooltip min-width="250">
             <template #default="{ row }">
               <div style="display: flex; align-items: center; gap: 8px">
                 <el-icon size="18">
@@ -264,6 +268,12 @@
               <el-tag size="small" :type="row.is_folder ? 'warning' : 'info'" effect="plain">
                 {{ row.is_folder ? '文件夹' : '文件' }}
               </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="状态" width="100" align="center">
+            <template #default="{ row }">
+              <el-tag v-if="row.is_existed" size="small" type="success" effect="light">已同步</el-tag>
+              <span v-else style="color: #94a3b8; font-size: 12px">-</span>
             </template>
           </el-table-column>
           <el-table-column prop="updated_at" label="更新时间" width="170" sortable />
@@ -331,6 +341,14 @@ const startFileDialogVisible = ref(false)
 const selectedStartFileName = ref('')
 const tempStartFileId = ref('')
 
+// 处理表格行样式
+const tableRowClassName = ({ row }) => {
+  if (row.is_existed) {
+    return 'existed-row'
+  }
+  return ''
+}
+
 // 独立目录弹窗相关
 const folderDialogVisible = ref(false)
 const loadingFolders = ref(false)
@@ -341,19 +359,22 @@ const newFolderName = ref('')
 const creatingFolder = ref(false)
 
 const formatSize = (bytes) => {
-  if (bytes <= 0) return '0 B'
+  const b = Number(bytes)
+  if (isNaN(b) || b <= 0) return '0 B'
   const units = ['B', 'KB', 'MB', 'GB', 'TB']
-  const i = Math.floor(Math.log(bytes) / Math.log(1024))
-  return `${(bytes / Math.pow(1024, i)).toFixed(2)} ${units[i]}`
+  const i = Math.floor(Math.log(b) / Math.log(1024))
+  return `${(b / Math.pow(1024, i)).toFixed(2)} ${units[i]}`
 }
 
 const groupedAccounts = computed(() => {
+  if (!accounts.value) return []
   const groups = [
     { label: '移动云盘', platform: '139', options: [] },
     { label: '夸克网盘', platform: 'quark', options: [] }
   ]
   
   accounts.value.forEach(acc => {
+    if (!acc) return
     const group = groups.find(g => g.platform === acc.platform)
     if (group) {
       group.options.push(acc)
@@ -364,7 +385,7 @@ const groupedAccounts = computed(() => {
 })
 
 const selectedAccountPlatform = computed(() => {
-  if (!form.value.account_id) return ''
+  if (!form.value.account_id || !accounts.value) return ''
   const account = accounts.value.find(acc => acc.id === form.value.account_id)
   if (account) {
     return account.platform === '139' ? '移动云盘' : 'Quark'
@@ -407,7 +428,8 @@ const openStartFileDialog = async () => {
     const data = await parseShareLink({
       account_id: form.value.account_id,
       share_url: form.value.share_url,
-      extract_code: form.value.extract_code
+      extract_code: form.value.extract_code,
+      save_path: form.value.save_path
     })
     shareFiles.value = data
     
@@ -474,13 +496,11 @@ const loadFolders = async (node, resolve) => {
     return resolve([])
   }
   
-  // 0层：直接返回虚拟根节点
   if (node.level === 0) {
-    pathIdMap.value['/'] = '' // 确保映射表里有根节点的合法记录
+    pathIdMap.value['/'] = '' 
     return resolve([{ label: '根目录', path: '/', id: '', isLeaf: false }])
   }
 
-  // 1层及以上：使用父节点（虚拟根或真实目录）的属性请求后端
   const parentID = node.data.id
   const parentPath = node.data.path
   
@@ -510,10 +530,8 @@ const handleInlineCreateFolder = async () => {
   }
   
   const currentPath = selectedTreePath.value || '/'
-  // 从选中状态取 ID，若为空则默认取虚拟根节点的空字符串 ''
   const currentID = selectedTreeId.value || '' 
 
-  // 前端事前拦截：检查是否已存在同名文件夹
   if (folderTreeRef.value) {
     const currentNode = folderTreeRef.value.getNode(currentPath)
     if (currentNode && currentNode.childNodes) {
@@ -533,7 +551,6 @@ const handleInlineCreateFolder = async () => {
     pathIdMap.value[res.path] = res.id
     
     if (folderTreeRef.value) {
-      // 由于存在虚拟根节点，getNode 一定能找到有效的父节点（包括 '/'）
       const currentNode = folderTreeRef.value.getNode(currentPath)
       if (currentNode) {
         folderTreeRef.value.append(res, currentNode)
@@ -628,7 +645,6 @@ const handleEdit = async (row) => {
     start_file_name: row.start_file_name
   }
 
-  // 优化回显：如果数据库里有存文件名，直接秒开显示，不再请求后端
   if (row.start_file_id) {
     selectedStartFileName.value = row.start_file_name || `ID: ${row.start_file_id} (文件名未记录)`
   } else {
@@ -851,6 +867,20 @@ html.dark .task-name-cell .name {
 
 .unmatched-text {
   color: #f59e0b;
+}
+
+.existed-row {
+  background-color: var(--el-fill-color-lighter) !important;
+  color: #94a3b8;
+}
+
+.existed-row span {
+  opacity: 0.8;
+}
+
+.existed-tag {
+  margin-left: 8px;
+  flex-shrink: 0;
 }
 
 .custom-tree-node {
