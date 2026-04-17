@@ -15,7 +15,8 @@ type FileInfo struct {
 	IsFolder   bool      `json:"is_folder"`
 	Size       int64     `json:"size"`
 	UpdatedAt  string    `json:"updated_at"`
-	UpdateTime time.Time `json:"-"` // 解析后的标准时间
+	UpdateTime time.Time `json:"-"`          // 解析后的标准时间
+	IsExisted  bool      `json:"is_existed"` // 标记是否已在目标目录存在
 }
 
 // CloudDrive 定义了所有云盘必须实现的标准接口

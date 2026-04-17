@@ -1,52 +1,45 @@
 package api
 
 import (
+	"log"
+	"net/http"
+	"regexp"
+
 	"github.com/gin-gonic/gin"
 	"github.com/zcq/clouddrive-auto-save/internal/core"
 	"github.com/zcq/clouddrive-auto-save/internal/core/renamer"
 	"github.com/zcq/clouddrive-auto-save/internal/db"
-	"log"
-	"net/http"
-	"regexp"
-	"time"
 )
-
-type PreviewRequest struct {
-	AccountID   uint       `json:"account_id" binding:"required"`
-	ShareURL    string     `json:"share_url" binding:"required"`
-	ExtractCode string     `json:"extract_code"`
-	StartDate   *time.Time `json:"start_date"`
-	Pattern     string     `json:"pattern"`
-	Replacement string     `json:"replacement"`
-	Name        string     `json:"name"` // 任务名称，用于变量替换
-}
 
 type PreviewResult struct {
 	OriginalName string `json:"original_name"`
 	NewName      string `json:"new_name"`
 	Matched      bool   `json:"matched"`
-	IsFiltered   bool   `json:"is_filtered"`
 }
 
 func previewTask(c *gin.Context) {
-	var req PreviewRequest
+	var req struct {
+		AccountID   uint   `json:"account_id" binding:"required"`
+		ShareURL    string `json:"share_url" binding:"required"`
+		ExtractCode string `json:"extract_code"`
+		Pattern     string `json:"pattern"`
+		Replacement string `json:"replacement"`
+		Name        string `json:"name"`
+	}
+
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	log.Printf("[API] 正在预览任务重命名结果: TaskName=%s, ShareURL=%s", req.Name, req.ShareURL)
-
 	var account db.Account
 	if err := db.DB.First(&account, req.AccountID).Error; err != nil {
-		log.Printf("[API] 预览失败: 账号未找到 (ID: %d)", req.AccountID)
 		c.JSON(http.StatusNotFound, gin.H{"error": "account not found"})
 		return
 	}
 
 	driver := core.GetDriver(&account)
 	if driver == nil {
-		log.Printf("[API] 预览失败: 驱动加载失败 (Platform: %s)", account.Platform)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "driver not found"})
 		return
 	}
@@ -54,26 +47,18 @@ func previewTask(c *gin.Context) {
 	ctx := c.Request.Context()
 	files, err := driver.ParseShare(ctx, req.ShareURL, req.ExtractCode)
 	if err != nil {
-		log.Printf("[API] 预览解析异常: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	// 实例化重命名引擎
 	renameProc := renamer.NewProcessor()
-
 	var results []PreviewResult
+
 	for _, f := range files {
 		res := PreviewResult{
 			OriginalName: f.Name,
 			NewName:      f.Name,
-		}
-
-		// 日期过滤逻辑
-		if req.StartDate != nil && !f.UpdateTime.IsZero() && f.UpdateTime.Before(*req.StartDate) {
-			res.IsFiltered = true
-			results = append(results, res)
-			continue
+			Matched:      false,
 		}
 
 		// 重命名逻辑
@@ -109,6 +94,7 @@ func parseShareLinkInfo(c *gin.Context) {
 		AccountID   uint   `json:"account_id" binding:"required"`
 		ShareURL    string `json:"share_url" binding:"required"`
 		ExtractCode string `json:"extract_code"`
+		SavePath    string `json:"save_path"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -116,7 +102,7 @@ func parseShareLinkInfo(c *gin.Context) {
 		return
 	}
 
-	log.Printf("[API] 正在解析分享链接: %s (AccountID: %d)", req.ShareURL, req.AccountID)
+	log.Printf("[API] 正在解析分享链接: %s (AccountID: %d, SavePath: %s)", req.ShareURL, req.AccountID, req.SavePath)
 
 	var account db.Account
 	if err := db.DB.First(&account, req.AccountID).Error; err != nil {
@@ -135,9 +121,27 @@ func parseShareLinkInfo(c *gin.Context) {
 	ctx := c.Request.Context()
 	files, err := driver.ParseShare(ctx, req.ShareURL, req.ExtractCode)
 	if err != nil {
-		log.Printf("[API] 解析异常: %v", err)
+		log.Printf("[API] 解析失败: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
+	}
+
+	// 执行同名检查逻辑
+	if req.SavePath != "" && len(files) > 0 {
+		targetID, err := driver.PrepareTargetPath(ctx, req.SavePath)
+		if err == nil {
+			existingMap := make(map[string]bool)
+			existingFiles, _ := driver.ListFiles(ctx, targetID)
+			for _, ef := range existingFiles {
+				existingMap[ef.Name] = true
+			}
+
+			for i := range files {
+				if existingMap[files[i].Name] {
+					files[i].IsExisted = true
+				}
+			}
+		}
 	}
 
 	log.Printf("[API] 解析完成: 发现 %d 个文件/文件夹", len(files))
