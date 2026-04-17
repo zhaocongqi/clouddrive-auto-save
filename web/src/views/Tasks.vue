@@ -30,25 +30,14 @@
         
         <el-table-column label="状态" width="120">
           <template #default="{ row }">
-            <el-tooltip
-              v-if="row.message && row.message.includes('[Fatal]')"
-              :content="row.message"
-              placement="top"
-              effect="dark"
-            >
-              <el-tag type="danger" style="cursor: help">
-                <div class="status-inner">
-                  <el-icon><AlertTriangle /></el-icon>
-                  LINK ERROR
-                </div>
+            <div class="status-wrapper">
+              <el-tooltip v-if="row.message && row.message.includes('[Fatal]')" :content="row.message" placement="top" effect="dark">
+                <el-tag type="danger" style="cursor:help"><div class="status-inner"><el-icon><AlertTriangle /></el-icon>LINK ERROR</div></el-tag>
+              </el-tooltip>
+              <el-tag v-else :type="getStatusType(row.status)">
+                <div class="status-inner"><el-icon v-if="row.status === 'running'" class="icon-spin"><RefreshCw /></el-icon>{{ row.status.toUpperCase() }}</div>
               </el-tag>
-            </el-tooltip>
-            <el-tag v-else :type="getStatusType(row.status)">
-              <div class="status-inner">
-                <el-icon v-if="row.status === 'running'" class="icon-spin"><RefreshCw /></el-icon>
-                {{ row.status.toUpperCase() }}
-              </div>
-            </el-tag>
+            </div>
           </template>
         </el-table-column>
 
@@ -61,7 +50,15 @@
         <el-table-column label="操作" width="220" fixed="right">
           <template #default="{ row }">
             <el-button-group>
-              <el-button link type="primary" :icon="Play" :disabled="row.status === 'running'" @click="handleRun(row)">运行</el-button>
+              <el-button 
+                link 
+                type="primary" 
+                :icon="Play" 
+                :disabled="row.status === 'running' || !!(row.message && row.message.includes('[Fatal]'))" 
+                @click="handleRun(row)"
+              >
+                运行
+              </el-button>
               <el-button link type="primary" :icon="Edit" @click="handleEdit(row)">编辑</el-button>
               <el-button link type="danger" :icon="Trash2" @click="handleDelete(row)">删除</el-button>
             </el-button-group>
