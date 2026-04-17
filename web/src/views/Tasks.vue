@@ -28,6 +28,13 @@
         
         <el-table-column prop="save_path" label="保存路径" min-width="150" show-overflow-tooltip />
         
+        <el-table-column prop="cron" label="定时规则" width="120" show-overflow-tooltip>
+          <template #default="{ row }">
+            <el-tag size="small" type="info" v-if="row.cron"><el-icon><Clock /></el-icon> {{ row.cron }}</el-tag>
+            <span v-else class="empty-text">手动</span>
+          </template>
+        </el-table-column>
+
         <el-table-column label="状态" width="120">
           <template #default="{ row }">
             <div class="status-wrapper">
@@ -171,6 +178,24 @@
 
         <el-divider>整理规则与预览</el-divider>
         
+        <el-row :gutter="20">
+          <el-col :span="24">
+            <el-form-item label="定时执行 (Cron)">
+              <div style="display: flex; align-items: center; gap: 15px; width: 100%;">
+                <el-switch v-model="enableCron" active-text="开启" inactive-text="关闭" @change="handleCronSwitch" />
+                <el-select v-if="enableCron" v-model="cronPreset" placeholder="选择预设频率" style="width: 180px" @change="handleCronPreset">
+                  <el-option label="每小时" value="0 0 * * * *" />
+                  <el-option label="每 6 小时" value="0 0 */6 * * *" />
+                  <el-option label="每天凌晨 2 点" value="0 0 2 * * *" />
+                  <el-option label="每周一凌晨 2 点" value="0 0 2 * * 1" />
+                  <el-option label="自定义" value="custom" />
+                </el-select>
+                <el-input v-if="enableCron && cronPreset === 'custom'" v-model="form.cron" placeholder="Cron 表达式 (秒 分 时 日 月 周)" style="flex: 1" />
+              </div>
+            </el-form-item>
+          </el-col>
+        </el-row>
+
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="重命名正则 (Pattern)">
@@ -349,7 +374,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, computed } from 'vue'
-import { Plus, Play, Edit, Trash2, RefreshCw, Folder, File, Info, Cloud, ExternalLink, AlertTriangle } from 'lucide-vue-next'
+import { Plus, Play, Edit, Trash2, RefreshCw, Folder, File, Info, Cloud, ExternalLink, AlertTriangle, Clock } from 'lucide-vue-next'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getTasks, createTask, updateTask, deleteTask, runTask, previewTask, parseShareLink } from '../api/task'
 import { getAccounts, getFolders, createFolder } from '../api/account'
@@ -359,6 +384,27 @@ const accounts = ref([])
 const loading = ref(false)
 const dialogVisible = ref(false)
 const submitting = ref(false)
+
+// 定时执行相关
+const enableCron = ref(false)
+const cronPreset = ref('')
+
+const handleCronSwitch = (val) => {
+  if (!val) {
+    form.value.cron = ''
+    cronPreset.value = ''
+  } else {
+    // 默认预设
+    cronPreset.value = '0 0 * * * *'
+    form.value.cron = '0 0 * * * *'
+  }
+}
+
+const handleCronPreset = (val) => {
+  if (val !== 'custom') {
+    form.value.cron = val
+  }
+}
 
 // 预览相关
 const previewVisible = ref(false)
@@ -437,7 +483,8 @@ const form = ref({
   pattern: '',
   replacement: '',
   start_file_id: '',
-  start_file_name: ''
+  start_file_name: '',
+  cron: ''
 })
 
 // 链接变更处理
@@ -675,9 +722,11 @@ const confirmFolderSelection = () => {
 }
 
 const openAddDialog = () => {
-  form.value = { id: null, name: '', account_id: '', share_url: '', extract_code: '', save_path: '/', pattern: '', replacement: '', start_file_id: '', start_file_name: '' }
+  form.value = { id: null, name: '', account_id: '', share_url: '', extract_code: '', save_path: '/', pattern: '', replacement: '', start_file_id: '', start_file_name: '', cron: '' }
   shareFiles.value = []
   selectedStartFileName.value = ''
+  enableCron.value = false
+  cronPreset.value = ''
   dialogVisible.value = true
 }
 
@@ -694,7 +743,17 @@ const handleEdit = async (row) => {
     pattern: row.pattern,
     replacement: row.replacement,
     start_file_id: row.start_file_id,
-    start_file_name: row.start_file_name
+    start_file_name: row.start_file_name,
+    cron: row.cron
+  }
+
+  // 初始化定时配置状态
+  const presets = ['0 0 * * * *', '0 0 */6 * * *', '0 0 2 * * *', '0 0 2 * * 1']
+  enableCron.value = !!row.cron
+  if (row.cron) {
+    cronPreset.value = presets.includes(row.cron) ? row.cron : 'custom'
+  } else {
+    cronPreset.value = ''
   }
 
   if (row.start_file_id) {
