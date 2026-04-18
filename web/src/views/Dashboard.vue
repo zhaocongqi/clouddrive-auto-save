@@ -89,7 +89,7 @@
         <el-card class="monitor-card">
           <template #header>
             <div class="card-header">
-              <span>任务微进度</span>
+              <span>任务执行监控</span>
               <el-tag size="small" type="info">{{ runningTasks.length }} 运行中</el-tag>
             </div>
           </template>
@@ -201,52 +201,55 @@ const fetchStats = async (isPoll = false) => {
     Object.assign(stats, data)
     
     // 同步运行中及最近完成的任务列表
-    if (data.running_tasks_list) {
-      const apiTasks = data.running_tasks_list
+    const apiTasks = data.running_tasks_list || []
       
-      // 1. 更新现有任务或添加新任务
-      apiTasks.forEach(task => {
-        const existing = runningTasks.value.find(t => String(t.id) === String(task.id))
-        if (existing) {
-          // 仅当 API 返回的进度比前端显示的更“先进”时才覆盖，防止回滚 SSE 的实时跳动
-          if (task.percent >= existing.percent) {
-            existing.name = task.name
-            existing.percent = task.percent
-            existing.stage = task.stage
-            existing.message = task.message
-          }
-        } else {
-          runningTasks.value.push({
-            id: task.id,
-            name: task.name,
-            percent: task.percent,
-            stage: task.stage,
-            message: task.message
-          })
+    // 1. 更新现有任务或添加新任务
+    apiTasks.forEach(task => {
+      const existing = runningTasks.value.find(t => String(t.id) === String(task.id))
+      if (existing) {
+        // 仅当 API 返回的进度比前端显示的更“先进”时才覆盖，防止回滚 SSE 的实时跳动
+        if (task.percent >= existing.percent) {
+          existing.name = task.name
+          existing.percent = task.percent
+          existing.stage = task.stage
+          existing.message = task.message
         }
-      })
-      
-      // 2. 移除 API 不再返回的任务（代表已过期或已隐藏）
-      // 仅在轮询时执行移除，防止 SSE 延迟导致任务闪现
-      if (isPoll) {
-        runningTasks.value = runningTasks.value.filter(t => 
-          apiTasks.some(at => String(at.id) === String(t.id))
-        )
+      } else {
+        runningTasks.value.push({
+          id: task.id,
+          name: task.name,
+          percent: task.percent,
+          stage: task.stage,
+          message: task.message
+        })
       }
-    }
+    })
+    
+    // 2. 移除 API 不再返回的任务（代表已过期或已隐藏）
+    runningTasks.value = runningTasks.value.filter(t => 
+      apiTasks.some(at => String(at.id) === String(t.id))
+    )
   } catch (error) {
     console.error('获取统计数据失败:', error)
   }
 }
 
+let pollTimer = null
+
 onMounted(() => {
   fetchStats()
   initSSE()
   fetchRecentLogs()
+
+  // 恢复 5 秒轮询，负责处理隐式状态变化（如 8s 过期自动消失）
+  pollTimer = setInterval(() => {
+    fetchStats(true)
+  }, 5000)
 })
 
 onUnmounted(() => {
   if (eventSource) eventSource.close()
+  if (pollTimer) clearInterval(pollTimer)
 })
 
 const fetchRecentLogs = async () => {
