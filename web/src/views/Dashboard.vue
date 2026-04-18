@@ -98,13 +98,26 @@
             <div v-for="task in runningTasks" :key="task.id" class="task-progress-card">
               <div class="task-info">
                 <span class="task-name">{{ task.name }}</span>
-                <el-icon class="is-loading"><Loader2 /></el-icon>
+                <div class="task-actions">
+                  <el-icon v-if="task.percent < 100" class="is-loading"><Loader2 /></el-icon>
+                  <el-icon v-else-if="task.stage === 'Success'" color="#67c23a"><CheckCircle2 /></el-icon>
+                  <el-icon v-else-if="task.stage === 'Failed'" color="#f56c6c"><AlertCircle /></el-icon>
+                  <el-button v-if="task.percent === 100" type="info" link @click="dismissTask(task.id)" style="margin-left: 8px; padding: 0">
+                    <el-icon><X /></el-icon>
+                  </el-button>
+                </div>
               </div>
               <div class="task-stage">
-                <el-tag size="small" effect="dark">{{ task.stage }}</el-tag>
+                <el-tag size="small" :type="getStageTagType(task.stage)" effect="dark">{{ task.stage }}</el-tag>
                 <span class="stage-msg">{{ task.message }}</span>
               </div>
-              <el-progress :percentage="50" :indeterminate="true" :show-text="false" />
+              <el-progress 
+                :percentage="task.percent" 
+                :status="task.stage === 'Failed' ? 'exception' : (task.percent === 100 ? 'success' : '')"
+                :stroke-width="10"
+                striped
+                :striped-flow="task.percent < 100"
+              />
             </div>
 
             <div v-if="runningTasks.length === 0" class="monitor-empty">
@@ -160,7 +173,8 @@ import {
   Play,
   CheckCircle2,
   AlertCircle,
-  Loader2
+  Loader2,
+  X
 } from 'lucide-vue-next'
 import { getStats, clearLogsAPI } from '../api/dashboard'
 import { runTask } from '../api/task'
@@ -171,7 +185,8 @@ const stats = reactive({
   capacity_used: 0,
   today_completed: 0,
   active_accounts: 0,
-  recent_activities: []
+  recent_activities: [],
+  running_tasks_list: []
 })
 
 // 日志与任务监控
@@ -180,23 +195,66 @@ const terminalRef = ref(null)
 const runningTasks = ref([])
 let eventSource = null
 
-const fetchStats = async () => {
+const fetchStats = async (isPoll = false) => {
   try {
     const data = await getStats()
     Object.assign(stats, data)
+    
+    // 同步运行中及最近完成的任务列表
+    if (data.running_tasks_list) {
+      const apiTasks = data.running_tasks_list
+      
+      // 1. 更新现有任务或添加新任务
+      apiTasks.forEach(task => {
+        const existing = runningTasks.value.find(t => String(t.id) === String(task.id))
+        if (existing) {
+          // 仅当 API 返回的进度比前端显示的更“先进”时才覆盖，防止回滚 SSE 的实时跳动
+          if (task.percent >= existing.percent) {
+            existing.name = task.name
+            existing.percent = task.percent
+            existing.stage = task.stage
+            existing.message = task.message
+          }
+        } else {
+          runningTasks.value.push({
+            id: task.id,
+            name: task.name,
+            percent: task.percent,
+            stage: task.stage,
+            message: task.message
+          })
+        }
+      })
+      
+      // 2. 移除 API 不再返回的任务（代表已过期或已隐藏）
+      // 仅在轮询时执行移除，防止 SSE 延迟导致任务闪现
+      if (isPoll) {
+        runningTasks.value = runningTasks.value.filter(t => 
+          apiTasks.some(at => String(at.id) === String(t.id))
+        )
+      }
+    }
   } catch (error) {
     console.error('获取统计数据失败:', error)
   }
 }
 
+let pollTimer = null
+
 onMounted(() => {
   fetchStats()
   initSSE()
   fetchRecentLogs()
+  
+  // 每 5 秒轮询一次 API，确保状态最终一致
+  pollTimer = setInterval(() => {
+    fetchStats(true)
+  }, 5000)
 })
 
 onUnmounted(() => {
   if (eventSource) eventSource.close()
+  if (pollTimer) clearInterval(pollTimer)
 })
 
 const fetchRecentLogs = async () => {
@@ -204,6 +262,7 @@ const fetchRecentLogs = async () => {
     const response = await fetch('/api/dashboard/logs/recent')
     const data = await response.json()
     logs.value = data
+    // 不再需要回放进度日志，因为 fetchStats 已经从 DB 拿到了最新状态
     scrollToBottom()
   } catch (error) {
     console.error('获取历史日志失败:', error)
@@ -215,7 +274,7 @@ const initSSE = () => {
   eventSource = new EventSource('/api/dashboard/logs')
   eventSource.onmessage = (event) => {
     const msg = event.data
-    if (msg.startsWith('[PROGRESS:')) {
+    if (msg.includes('[PROGRESS:')) {
       handleProgressMessage(msg)
     } else {
       logs.value.push(msg)
@@ -229,28 +288,59 @@ const initSSE = () => {
 }
 
 const handleProgressMessage = (msg) => {
-  // 格式: [PROGRESS:TaskID:Stage:Message]
-  const content = msg.substring(10, msg.length - 1)
-  const parts = content.split(':')
-  if (parts.length < 3) return
+  // 协议格式: [PROGRESS:TaskID:Percent:Stage:Message]
+  const match = msg.match(/\[PROGRESS:(.+)\]/)
+  if (!match) return
+  
+  const parts = match[1].split(':')
+  if (parts.length < 4) return
   
   const taskId = parts[0]
-  const stage = parts[1]
-  const info = parts.slice(2).join(':')
+  const percent = parseInt(parts[1])
+  const stage = parts[2]
+  const info = parts.slice(3).join(':')
   
-  const taskIdx = runningTasks.value.findIndex(t => t.id === taskId)
+  const taskIdx = runningTasks.value.findIndex(t => String(t.id) === String(taskId))
   
   if (taskIdx > -1) {
-    if (stage === 'Finished') {
-      runningTasks.value.splice(taskIdx, 1)
-      fetchStats()
-    } else {
-      runningTasks.value[taskIdx].stage = stage
-      runningTasks.value[taskIdx].message = info
-    }
-  } else if (stage !== 'Finished') {
-    runningTasks.value.push({ id: taskId, stage, message: info, name: '正在执行的任务' })
+    // 实时更新任务状态
+    const task = runningTasks.value[taskIdx]
+    task.percent = percent
+    task.stage = stage
+    task.message = info
+  } else if (stage !== 'Success' && stage !== 'Failed' && stage !== 'Finished') {
+    // 如果是新任务且尚未完成，加入列表
+    runningTasks.value.push({ 
+      id: taskId, 
+      name: `任务 #${taskId}`, 
+      percent, 
+      stage, 
+      message: info 
+    })
+    fetchStats()
   }
+}
+
+const dismissTask = (taskId) => {
+  // 注意：这里手动关闭只是前端临时移除，如果后端 DB 依然返回该任务（在15秒内），下次轮询会重新出现
+  // 建议让其自然消失，或在这里调用后端接口标记已读（目前暂简单移除）
+  const idx = runningTasks.value.findIndex(t => String(t.id) === String(taskId))
+  if (idx > -1) {
+    runningTasks.value.splice(idx, 1)
+  }
+}
+
+const getStageTagType = (stage) => {
+  const map = {
+    'Started': 'info',
+    'Parsing': '',
+    'Checking': 'warning',
+    'Saving': 'primary',
+    'Renaming': 'success',
+    'Success': 'success',
+    'Failed': 'danger'
+  }
+  return map[stage] || ''
 }
 
 const scrollToBottom = () => {
@@ -463,6 +553,12 @@ html.dark .stat-value { color: #f1f5f9; }
   justify-content: space-between;
   align-items: center;
   margin-bottom: 12px;
+}
+
+.task-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .task-name {

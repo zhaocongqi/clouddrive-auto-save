@@ -330,15 +330,21 @@ func getDashboardStats(c *gin.Context) {
 	var activeAccounts int64
 	db.DB.Model(&db.Account{}).Where("status = 1").Count(&activeAccounts)
 
+	var runningTasksList []db.Task
+	// 获取：运行中、失败、以及 15 秒内成功的任务
+	db.DB.Where("status = ? OR status = ? OR (status = ? AND last_run >= ?)",
+		"running", "failed", "success", time.Now().Add(-15*time.Second)).Find(&runningTasksList)
+
 	var recentTasks []db.Task
 	db.DB.Order("last_run desc").Limit(5).Find(&recentTasks)
 
 	c.PureJSON(http.StatusOK, gin.H{
-		"scheduled_tasks":   scheduledTasks,
-		"capacity_used":     capacityUsed,
-		"today_completed":   todayCompleted,
-		"active_accounts":   activeAccounts,
-		"recent_activities": recentTasks,
+		"scheduled_tasks":    scheduledTasks,
+		"capacity_used":      capacityUsed,
+		"today_completed":    todayCompleted,
+		"active_accounts":    activeAccounts,
+		"recent_activities":  recentTasks,
+		"running_tasks_list": runningTasksList,
 	})
 }
 
