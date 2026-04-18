@@ -10,6 +10,7 @@ import (
 	"github.com/zcq/clouddrive-auto-save/internal/core"
 	"github.com/zcq/clouddrive-auto-save/internal/core/renamer"
 	"github.com/zcq/clouddrive-auto-save/internal/db"
+	"github.com/zcq/clouddrive-auto-save/internal/utils"
 )
 
 // Job 代表一个待执行的转存任务
@@ -84,6 +85,7 @@ func (m *Manager) updateProgress(task *db.Task, percent int, stage, message stri
 		"message": message,
 	})
 	log.Printf("[PROGRESS:%d:%d:%s:%s]", task.ID, percent, stage, message)
+	utils.BroadcastTaskUpdate(task)
 }
 
 func (m *Manager) execute(task *db.Task) {
@@ -224,4 +226,6 @@ func (m *Manager) finishTask(task *db.Task, status, message string) {
 	})
 	log.Printf("Task %d finished with status: %s", task.ID, status)
 	log.Printf("[PROGRESS:%d:100:%s:%s]", task.ID, task.Stage, message)
+	utils.BroadcastTaskUpdate(task)
+	utils.BroadcastStatsUpdate()
 }

@@ -210,6 +210,10 @@ func createTask(c *gin.Context) {
 	log.Printf("[API] 创建任务: %s", task.Name)
 	db.DB.Create(&task)
 
+	// 推送实时事件
+	utils.BroadcastTaskUpdate(&task)
+	utils.BroadcastStatsUpdate()
+
 	// 注册定时任务
 	scheduler.Global.UpdateTask(task.ID, task.ScheduleMode, task.Cron)
 
@@ -269,6 +273,9 @@ func updateTask(c *gin.Context) {
 		return
 	}
 
+	// 推送更新事件
+	utils.BroadcastTaskUpdate(&task)
+
 	// 刷新调度器
 	scheduler.Global.UpdateTask(task.ID, task.ScheduleMode, task.Cron)
 
@@ -283,6 +290,11 @@ func deleteTask(c *gin.Context) {
 	scheduler.Global.RemoveTask(uint(idNum))
 
 	db.DB.Delete(&db.Task{}, id)
+
+	// 推送实时事件
+	utils.BroadcastTaskDelete(uint(idNum))
+	utils.BroadcastStatsUpdate()
+
 	c.PureJSON(http.StatusOK, gin.H{"message": "task deleted"})
 }
 
@@ -301,6 +313,12 @@ func runTask(c *gin.Context) {
 		c.PureJSON(http.StatusBadRequest, gin.H{"error": "task is already running"})
 		return
 	}
+
+	// 立即更新状态并推送
+	task.Status = "running"
+	db.DB.Model(&task).Update("status", "running")
+	utils.BroadcastTaskUpdate(&task)
+	utils.BroadcastStatsUpdate()
 
 	WorkerManager.Submit(worker.Job{Task: &task})
 	c.PureJSON(http.StatusOK, gin.H{"message": "task submitted to worker pool"})
@@ -423,6 +441,9 @@ func updateScheduleSettings(c *gin.Context) {
 	db.DB.Save(&db.Setting{Key: "global_schedule_cron", Value: input.Cron})
 
 	scheduler.Global.UpdateGlobalSchedule(input.Cron, input.Enabled)
+
+	// 推送统计更新
+	utils.BroadcastStatsUpdate()
 
 	c.PureJSON(http.StatusOK, gin.H{"message": "settings updated"})
 }
