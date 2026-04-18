@@ -6,14 +6,14 @@
     </div>
 
     <el-row :gutter="24" class="stat-cards">
-      <el-col :xs="24" :sm="12" :md="6">
+        <el-col :xs="24" :sm="12" :md="6">
         <el-card class="stat-card" body-style="padding: 20px">
           <div class="stat-icon purple">
             <Activity :size="24" />
           </div>
           <div class="stat-info">
-            <div class="stat-label">运行中任务</div>
-            <div class="stat-value">{{ stats.running_tasks }}</div>
+            <div class="stat-label">已规划任务</div>
+            <div class="stat-value">{{ stats.scheduled_tasks }}</div>
           </div>
         </el-card>
       </el-col>
@@ -167,7 +167,7 @@ import { runTask } from '../api/task'
 import { ElMessage } from 'element-plus'
 
 const stats = reactive({
-  running_tasks: 0,
+  scheduled_tasks: 0,
   capacity_used: 0,
   today_completed: 0,
   active_accounts: 0,
