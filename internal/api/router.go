@@ -47,6 +47,9 @@ func InitRouter(wm *worker.Manager) *gin.Engine {
 		api.GET("/dashboard/logs", streamLogs)
 		api.GET("/dashboard/logs/recent", getRecentLogs)
 		api.DELETE("/dashboard/logs/recent", clearRecentLogs)
+
+		api.GET("/settings/schedule", getScheduleSettings)
+		api.POST("/settings/schedule", updateScheduleSettings)
 	}
 
 	// 静态资源处理
@@ -194,9 +197,7 @@ func createTask(c *gin.Context) {
 	db.DB.Create(&task)
 
 	// 注册定时任务
-	if task.Cron != "" {
-		scheduler.Global.UpdateTask(task.ID, task.Cron)
-	}
+	scheduler.Global.UpdateTask(task.ID, task.ScheduleMode, task.Cron)
 
 	c.PureJSON(http.StatusOK, task)
 }
@@ -229,6 +230,8 @@ func updateTask(c *gin.Context) {
 		"replacement":     task.Replacement,
 		"start_file_id":   task.StartFileID,
 		"start_file_name": task.StartFileName,
+		"cron":            task.Cron,
+		"schedule_mode":   task.ScheduleMode,
 	}
 
 	// 仅当分享链接或提取码发生变动时，才重置状态以解除 [Fatal] 封锁
@@ -244,7 +247,7 @@ func updateTask(c *gin.Context) {
 	}
 
 	// 刷新调度器
-	scheduler.Global.UpdateTask(task.ID, task.Cron)
+	scheduler.Global.UpdateTask(task.ID, task.ScheduleMode, task.Cron)
 
 	c.PureJSON(http.StatusOK, task)
 }
@@ -337,4 +340,41 @@ func streamLogs(c *gin.Context) {
 func getRecentLogs(c *gin.Context) {
 	logs := utils.GlobalBroadcaster.GetRecent()
 	c.PureJSON(http.StatusOK, logs)
+}
+
+func getScheduleSettings(c *gin.Context) {
+	var enabledSetting db.Setting
+	var cronSetting db.Setting
+
+	db.DB.Where("key = ?", "global_schedule_enabled").First(&enabledSetting)
+	db.DB.Where("key = ?", "global_schedule_cron").First(&cronSetting)
+
+	c.PureJSON(http.StatusOK, gin.H{
+		"enabled": enabledSetting.Value == "true",
+		"cron":    cronSetting.Value,
+	})
+}
+
+func updateScheduleSettings(c *gin.Context) {
+	var input struct {
+		Enabled bool   `json:"enabled"`
+		Cron    string `json:"cron"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.PureJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	enabledStr := "false"
+	if input.Enabled {
+		enabledStr = "true"
+	}
+
+	// 使用 Updates 或 FirstOrCreate 确保 Key 存在
+	db.DB.Save(&db.Setting{Key: "global_schedule_enabled", Value: enabledStr})
+	db.DB.Save(&db.Setting{Key: "global_schedule_cron", Value: input.Cron})
+
+	scheduler.Global.UpdateGlobalSchedule(input.Cron, input.Enabled)
+
+	c.PureJSON(http.StatusOK, gin.H{"message": "settings updated"})
 }
