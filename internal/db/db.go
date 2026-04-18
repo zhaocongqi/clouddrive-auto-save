@@ -53,7 +53,9 @@ type Task struct {
 
 	NextRun     time.Time `json:"next_run"`
 	Status      string `gorm:"size:20;default:'pending'" json:"status"` // pending, running, success, failed
-	Message     string `gorm:"type:text" json:"message"`     // 最后运行的错误信息或统计
+	Percent     int    `gorm:"default:0" json:"percent"`               // 任务执行进度百分比
+	Stage       string `gorm:"size:50" json:"stage"`                   // 任务当前执行阶段
+	Message     string `gorm:"type:text" json:"message"`                // 最后运行的错误信息或统计
 }
 
 // CommonFolder 常用目录

@@ -74,9 +74,21 @@ func (m *Manager) worker(id int) {
 	}
 }
 
+func (m *Manager) updateProgress(task *db.Task, percent int, stage, message string) {
+	task.Percent = percent
+	task.Stage = stage
+	task.Message = message
+	db.DB.Model(task).Updates(map[string]interface{}{
+		"percent": percent,
+		"stage":   stage,
+		"message": message,
+	})
+	log.Printf("[PROGRESS:%d:%d:%s:%s]", task.ID, percent, stage, message)
+}
+
 func (m *Manager) execute(task *db.Task) {
 	log.Printf("Executing task: %s (ID: %d)", task.Name, task.ID)
-	log.Printf("[PROGRESS:%d:Started:任务已进入执行队列]", task.ID)
+	m.updateProgress(task, 5, "Started", "任务已进入执行队列")
 
 	// 1. 更新任务状态为 running
 	db.DB.Model(task).Update("status", "running")
@@ -92,7 +104,7 @@ func (m *Manager) execute(task *db.Task) {
 	defer cancel()
 
 	// 2.1 获取分享全量文件
-	log.Printf("[PROGRESS:%d:Parsing:正在解析分享链接...]", task.ID)
+	m.updateProgress(task, 15, "Parsing", "正在解析分享链接...")
 	files, err := driver.ParseShare(ctx, task.ShareURL, task.ExtractCode)
 	if err != nil {
 		m.finishTask(task, "failed", fmt.Sprintf("Failed to parse share: %v", err))
@@ -100,7 +112,7 @@ func (m *Manager) execute(task *db.Task) {
 	}
 
 	// 2.2 获取目标目录已存在文件，用于去重跳过
-	log.Printf("[PROGRESS:%d:Checking:正在检查目标目录是否存在同名文件...]", task.ID)
+	m.updateProgress(task, 35, "Checking", "正在检查目标目录是否存在同名文件...")
 	targetID, err := driver.PrepareTargetPath(ctx, task.SavePath)
 	existingMap := make(map[string]bool)
 	if err == nil {
@@ -162,13 +174,12 @@ func (m *Manager) execute(task *db.Task) {
 		if skippedCount > 0 {
 			msg = fmt.Sprintf("无新文件需要转存 (已跳过 %d 个同名文件)", skippedCount)
 		}
-		log.Printf("[PROGRESS:%d:Finished:%s]", task.ID, msg)
 		m.finishTask(task, "success", msg)
 		return
 	}
 
 	// 2.4 执行转存
-	log.Printf("[PROGRESS:%d:Saving:正在转存 %d 个文件 (已跳过 %d 个同名文件)...]", task.ID, len(filteredIDs), skippedCount)
+	m.updateProgress(task, 65, "Saving", fmt.Sprintf("正在转存 %d 个文件 (已跳过 %d 个同名文件)...", len(filteredIDs), skippedCount))
 	err = driver.SaveLink(ctx, task.ShareURL, task.ExtractCode, task.SavePath, filteredIDs)
 	if err != nil {
 		m.finishTask(task, "failed", err.Error())
@@ -177,7 +188,7 @@ func (m *Manager) execute(task *db.Task) {
 
 	// 3. 执行重命名同步逻辑
 	if len(renameMap) > 0 {
-		log.Printf("[PROGRESS:%d:Renaming:正在同步执行网盘内重命名...]", task.ID)
+		m.updateProgress(task, 85, "Renaming", "正在同步执行网盘内重命名...")
 		// 转存完成后，重新拉取目录以获取新产生的文件 ID
 		targetFiles, err := driver.ListFiles(ctx, targetID)
 		if err == nil {
@@ -190,20 +201,27 @@ func (m *Manager) execute(task *db.Task) {
 		}
 	}
 
-	log.Printf("[PROGRESS:%d:Finished:转存任务全部完成]", task.ID)
 	m.finishTask(task, "success", "Transfer completed successfully")
 }
-
 
 func (m *Manager) finishTask(task *db.Task, status, message string) {
 	task.Status = status
 	task.Message = message
 	task.LastRun = time.Now()
-	
+	task.Percent = 100
+	if status == "success" {
+		task.Stage = "Success"
+	} else {
+		task.Stage = "Failed"
+	}
+
 	db.DB.Model(task).Updates(map[string]interface{}{
 		"status":   status,
 		"message":  message,
 		"last_run": task.LastRun,
+		"percent":  task.Percent,
+		"stage":    task.Stage,
 	})
 	log.Printf("Task %d finished with status: %s", task.ID, status)
+	log.Printf("[PROGRESS:%d:100:%s:%s]", task.ID, task.Stage, message)
 }
