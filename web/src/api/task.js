@@ -52,3 +52,18 @@ export function parseShareLink(data) {
     data
   })
 }
+
+export function getScheduleSettings() {
+  return request({
+    url: '/settings/schedule',
+    method: 'get'
+  })
+}
+
+export function updateScheduleSettings(data) {
+  return request({
+    url: '/settings/schedule',
+    method: 'post',
+    data
+  })
+}

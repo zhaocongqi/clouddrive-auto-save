@@ -8,6 +8,46 @@
       <el-button type="primary" :icon="Plus" @click="openAddDialog">创建任务</el-button>
     </div>
 
+    <!-- 全局调度控制 -->
+    <el-card class="global-settings-card" style="margin-bottom: 24px;">
+      <div class="global-settings-content">
+        <div class="setting-info">
+          <el-icon class="setting-icon"><Clock /></el-icon>
+          <div class="setting-text">
+            <span class="setting-title">全局自动调度模式</span>
+            <span class="setting-desc">开启后，所有状态为“跟随全局”的任务将按照右侧规则统一执行。</span>
+          </div>
+        </div>
+        <div class="setting-actions">
+          <div class="action-item">
+            <span class="action-label">全局开关:</span>
+            <el-switch 
+              v-model="globalSchedule.enabled" 
+              active-text="已开启" 
+              inactive-text="已关闭"
+              @change="saveGlobalSettings"
+            />
+          </div>
+          <el-divider direction="vertical" style="height: 32px; margin: 0 20px;" />
+          <div class="action-item">
+            <span class="action-label">调度频率:</span>
+            <el-input 
+              v-model="globalSchedule.cron" 
+              placeholder="Cron 表达式" 
+              style="width: 220px"
+              @blur="saveGlobalSettings"
+            >
+              <template #suffix>
+                <el-tooltip content="秒 分 时 日 月 周 (例如 0 0 2 * * * 每天凌晨2点)" placement="top">
+                  <el-icon style="cursor: help"><Info /></el-icon>
+                </el-tooltip>
+              </template>
+            </el-input>
+          </div>
+        </div>
+      </div>
+    </el-card>
+
     <el-card class="table-card">
       <el-table :data="taskList" v-loading="loading" style="width: 100%">
         <el-table-column label="任务名称" min-width="180">
@@ -28,10 +68,18 @@
         
         <el-table-column prop="save_path" label="保存路径" min-width="150" show-overflow-tooltip />
         
-        <el-table-column prop="cron" label="定时规则" width="120" show-overflow-tooltip>
+        <el-table-column prop="schedule_mode" label="调度规则" width="140">
           <template #default="{ row }">
-            <el-tag size="small" type="info" v-if="row.cron"><el-icon><Clock /></el-icon> {{ row.cron }}</el-tag>
-            <span v-else class="empty-text">手动</span>
+            <div v-if="row.schedule_mode === 'global'" class="schedule-tag">
+              <el-tag size="small" type="primary" effect="plain">跟随全局</el-tag>
+              <div class="schedule-sub" v-if="globalSchedule.enabled">{{ globalSchedule.cron }}</div>
+              <div class="schedule-sub disabled" v-else>全局已关闭</div>
+            </div>
+            <div v-else-if="row.schedule_mode === 'custom'" class="schedule-tag">
+              <el-tag size="small" type="warning" effect="plain">自定义</el-tag>
+              <div class="schedule-sub">{{ row.cron }}</div>
+            </div>
+            <el-tag v-else size="small" type="info" effect="plain">手动执行</el-tag>
           </template>
         </el-table-column>
 
@@ -176,21 +224,34 @@
           </div>
         </el-form-item>
 
-        <el-divider>整理规则与预览</el-divider>
+        <el-divider>调度规则与预览</el-divider>
         
         <el-row :gutter="20">
           <el-col :span="24">
-            <el-form-item label="定时执行 (Cron)">
+            <el-form-item label="调度模式" required>
+              <div class="schedule-mode-selector">
+                <el-radio-group v-model="form.schedule_mode" @change="handleScheduleModeChange">
+                  <el-radio label="global">跟随全局</el-radio>
+                  <el-radio label="custom">自定义频率</el-radio>
+                  <el-radio label="off">手动执行</el-radio>
+                </el-radio-group>
+              </div>
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-row :gutter="20" v-if="form.schedule_mode === 'custom'">
+          <el-col :span="24">
+            <el-form-item label="自定义频率 (Cron)">
               <div style="display: flex; align-items: center; gap: 15px; width: 100%;">
-                <el-switch v-model="enableCron" active-text="开启" inactive-text="关闭" @change="handleCronSwitch" />
-                <el-select v-if="enableCron" v-model="cronPreset" placeholder="选择预设频率" style="width: 180px" @change="handleCronPreset">
+                <el-select v-model="cronPreset" placeholder="选择预设频率" style="width: 180px" @change="handleCronPreset">
                   <el-option label="每小时" value="0 0 * * * *" />
                   <el-option label="每 6 小时" value="0 0 */6 * * *" />
                   <el-option label="每天凌晨 2 点" value="0 0 2 * * *" />
                   <el-option label="每周一凌晨 2 点" value="0 0 2 * * 1" />
-                  <el-option label="自定义" value="custom" />
+                  <el-option label="使用自定义表达式" value="custom" />
                 </el-select>
-                <el-input v-if="enableCron && cronPreset === 'custom'" v-model="form.cron" placeholder="Cron 表达式 (秒 分 时 日 月 周)" style="flex: 1" />
+                <el-input v-if="cronPreset === 'custom'" v-model="form.cron" placeholder="Cron 表达式 (秒 分 时 日 月 周)" style="flex: 1" />
               </div>
             </el-form-item>
           </el-col>
@@ -376,7 +437,7 @@
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { Plus, Play, Edit, Trash2, RefreshCw, Folder, File, Info, Cloud, ExternalLink, AlertTriangle, Clock } from 'lucide-vue-next'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getTasks, createTask, updateTask, deleteTask, runTask, previewTask, parseShareLink } from '../api/task'
+import { getTasks, createTask, updateTask, deleteTask, runTask, previewTask, parseShareLink, getScheduleSettings, updateScheduleSettings } from '../api/task'
 import { getAccounts, getFolders, createFolder } from '../api/account'
 
 const taskList = ref([])
@@ -385,16 +446,35 @@ const loading = ref(false)
 const dialogVisible = ref(false)
 const submitting = ref(false)
 
+// 全局调度设置
+const globalSchedule = ref({
+  enabled: false,
+  cron: ''
+})
+
+const fetchGlobalSettings = async () => {
+  try {
+    const data = await getScheduleSettings()
+    globalSchedule.value = data
+  } catch (err) {
+    console.error('获取全局设置失败:', err)
+  }
+}
+
+const saveGlobalSettings = async () => {
+  try {
+    await updateScheduleSettings(globalSchedule.value)
+    ElMessage.success('全局调度设置已更新')
+  } catch (err) {
+    console.error('更新全局设置失败:', err)
+  }
+}
+
 // 定时执行相关
-const enableCron = ref(false)
 const cronPreset = ref('')
 
-const handleCronSwitch = (val) => {
-  if (!val) {
-    form.value.cron = ''
-    cronPreset.value = ''
-  } else {
-    // 默认预设
+const handleScheduleModeChange = (val) => {
+  if (val === 'custom' && !form.value.cron) {
     cronPreset.value = '0 0 * * * *'
     form.value.cron = '0 0 * * * *'
   }
@@ -484,7 +564,8 @@ const form = ref({
   replacement: '',
   start_file_id: '',
   start_file_name: '',
-  cron: ''
+  cron: '',
+  schedule_mode: 'global'
 })
 
 // 链接变更处理
@@ -722,10 +803,22 @@ const confirmFolderSelection = () => {
 }
 
 const openAddDialog = () => {
-  form.value = { id: null, name: '', account_id: '', share_url: '', extract_code: '', save_path: '/', pattern: '', replacement: '', start_file_id: '', start_file_name: '', cron: '' }
+  form.value = { 
+    id: null, 
+    name: '', 
+    account_id: '', 
+    share_url: '', 
+    extract_code: '', 
+    save_path: '/', 
+    pattern: '', 
+    replacement: '', 
+    start_file_id: '', 
+    start_file_name: '', 
+    cron: '', 
+    schedule_mode: 'global' 
+  }
   shareFiles.value = []
   selectedStartFileName.value = ''
-  enableCron.value = false
   cronPreset.value = ''
   dialogVisible.value = true
 }
@@ -744,13 +837,13 @@ const handleEdit = async (row) => {
     replacement: row.replacement,
     start_file_id: row.start_file_id,
     start_file_name: row.start_file_name,
-    cron: row.cron
+    cron: row.cron,
+    schedule_mode: row.schedule_mode || 'global'
   }
 
   // 初始化定时配置状态
-  const presets = ['0 0 * * * *', '0 0 */6 * * *', '0 0 2 * * *', '0 0 2 * * 1']
-  enableCron.value = !!row.cron
-  if (row.cron) {
+  if (form.value.schedule_mode === 'custom' && row.cron) {
+    const presets = ['0 0 * * * *', '0 0 */6 * * *', '0 0 2 * * *', '0 0 2 * * 1']
     cronPreset.value = presets.includes(row.cron) ? row.cron : 'custom'
   } else {
     cronPreset.value = ''
@@ -818,6 +911,7 @@ const formatTime = (timeStr) => {
 
 onMounted(() => {
   fetchList()
+  fetchGlobalSettings()
   pollTimer = setInterval(() => {
     fetchList(true)
   }, 5000)
@@ -844,6 +938,90 @@ onUnmounted(() => {
 .title-section p {
   color: #64748b;
   margin: 4px 0 0 0;
+}
+
+.global-settings-card {
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--el-color-primary-light-9) 0%, var(--el-color-white) 100%);
+  border: 1px solid var(--el-color-primary-light-7);
+}
+
+.global-settings-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.setting-info {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.setting-icon {
+  font-size: 24px;
+  color: var(--el-color-primary);
+  background: var(--el-color-white);
+  padding: 10px;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.setting-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.setting-title {
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--el-text-color-primary);
+}
+
+.setting-desc {
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
+  margin-top: 2px;
+}
+
+.setting-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.action-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.action-label {
+  font-size: 13px;
+  color: var(--el-text-color-regular);
+  font-weight: 500;
+}
+
+.schedule-tag {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.schedule-sub {
+  font-size: 11px;
+  color: var(--el-text-color-secondary);
+  font-family: monospace;
+}
+
+.schedule-sub.disabled {
+  color: var(--el-color-danger);
+}
+
+.schedule-mode-selector {
+  margin-bottom: 10px;
 }
 
 .task-name-cell {
