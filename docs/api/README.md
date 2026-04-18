@@ -12,6 +12,7 @@
 2. [账号管理 (Accounts)](./accounts.md) - 139/Quark 账号的增删改查与校验。
 3. [任务管理 (Tasks)](./tasks.md) - 转存任务的生命周期管理与手动触发。
 4. [系统设置 (Settings)](./settings.md) - 全局调度规则与定时开关。
+5. [数据库设计 (Database Schema)](./database.md) - 核心数据表结构与字段说明。
 
 ## 全局响应格式
 所有接口均返回 JSON 格式数据。

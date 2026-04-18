@@ -14,7 +14,8 @@
 | `capacity_used` | int64 | 所有活跃账号已使用的云盘空间总和 (Bytes) |
 | `scheduled_tasks` | int64 | 当前已规划自动调度的任务总数 |
 | `today_completed` | int64 | 今日（零点起）成功执行完成的任务次数 |
-| `recent_activities`| Array | 最近执行过的 5 条任务记录列表 |
+| `running_tasks_list`| Array | **[新]** 当前正在执行中或最近完成的任务详情列表 |
+| `recent_activities`| Array | 最近执行过的 5 条任务历史记录列表 |
 
 ### 响应示例
 ```json
@@ -23,28 +24,32 @@
   "capacity_used": 103291877039,
   "scheduled_tasks": 3,
   "today_completed": 5,
-  "recent_activities": [
-    {
-      "id": 12,
-      "name": "夸克任务 [黑镜]",
-      "status": "success",
-      "last_run": "2026-04-10T14:30:00Z",
-      ...
-    }
-  ]
+  "running_tasks_list": [
+    { "id": 1, "name": "测试任务", "percent": 35, "stage": "Checking", ... }
+  ],
+  "recent_activities": [...]
 }
 ```
 
 ---
 
-## 2. 获取实时系统日志 (SSE)
-建立 Server-Sent Events 连接，实时获取网盘 API 请求与响应日志。
+## 2. 实时系统总线 (SSE)
+建立 Server-Sent Events 连接，实时获取系统日志、任务进度及全量同步事件。
 
 - **URL**: `/dashboard/logs`
 - **Method**: `GET`
 - **Headers**: `Accept: text/event-stream`
-- **Response**: `EventStream`
-    - **Event: `message`**: 包含格式化的日志文本。
+
+### 协议格式说明
+后端通过 SSE 推送的消息包含以下三种类型：
+
+1.  **普通日志**: 原始文本，直接展示在终端 UI 中。
+2.  **任务进度 (`[PROGRESS:...]`)**:
+    *   格式: `[PROGRESS:TaskID:Percent:Stage:Message]`
+    *   作用: 实时驱动前端仪表盘的“任务微进度”条。
+3.  **系统事件 (`[EVENT:...]`)**:
+    *   格式: `[EVENT:{"type":"task_update", "task":{...}}]`
+    *   作用: 实现后端驱动的 UI 同步（如：任务列表字段变更、任务删除），无需前端轮询。
 
 ---
 

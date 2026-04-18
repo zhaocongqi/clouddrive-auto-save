@@ -23,6 +23,8 @@
 | `start_file_name`| string | 否 | 起始文件名称，用于前端 UI 快速回显，减少接口解析等待 |
 | `schedule_mode`| string | 否 | **[新]** 调度模式: `global` (跟随全局), `custom` (自定义), `off` (手动)。默认为 `global` |
 | `cron` | string | 否 | **[新]** 当 `schedule_mode` 为 `custom` 时必填。Cron 表达式 (秒 分 时 日 月 周) |
+| `percent` | int | 否 | **[内部]** 实时进度百分比 |
+| `stage` | string | 否 | **[内部]** 当前执行阶段 |
 | `pattern` | string | 否 | 正则匹配表达式 |
 | `replacement` | string | 否 | 替换模板及魔法变量 |
 
