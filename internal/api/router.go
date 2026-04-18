@@ -368,7 +368,7 @@ func getDashboardStats(c *gin.Context) {
 		"running", "success", time.Now().Add(-15*time.Second), "failed", "Dismissed").Find(&runningTasksList)
 
 	var recentTasks []db.Task
-	db.DB.Order("last_run desc").Limit(5).Find(&recentTasks)
+	db.DB.Order("last_run desc").Limit(15).Find(&recentTasks)
 
 	c.PureJSON(http.StatusOK, gin.H{
 		"scheduled_tasks":    scheduledTasks,
