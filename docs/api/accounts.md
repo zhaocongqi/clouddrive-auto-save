@@ -49,12 +49,12 @@
 手动触发后端模拟登录，校验凭证是否有效并更新昵称、容量及会员信息。
 
 - **URL**: `/accounts/:id/check`
-- **Method**: `/POST`
-- **Response**: 返回更新后的账号对象。
+- **Method**: `POST`
+- **Response**: 返回更新后的账号对象（包含最新的 `last_check` 时间和 `status`）。
+- **Optimization**: 该接口已支持**人性化错误映射**，会将 139/Quark 的原始错误码自动转换为中文描述（如：“登录凭证无效或已过期”）。
 - **Errors**:
-    - `401 Unauthorized`: 登录凭证失效（如 Token 过期），Body 中包含 `{"error": "登录已失效 (Token Invalid)"}`。
+    - `401 Unauthorized`: 登录凭证失效。Body 中包含最新的账号状态对象，允许前端在报错的同时更新校验时间。
     - `404 Not Found`: 账号不存在。
-    - `500 Internal Server Error`: 驱动加载失败或系统内部错误。
 
 ---
 
