@@ -239,22 +239,14 @@ const fetchStats = async (isPoll = false) => {
   }
 }
 
-let pollTimer = null
-
 onMounted(() => {
   fetchStats()
   initSSE()
   fetchRecentLogs()
-  
-  // 每 5 秒轮询一次 API，确保状态最终一致
-  pollTimer = setInterval(() => {
-    fetchStats(true)
-  }, 5000)
 })
 
 onUnmounted(() => {
   if (eventSource) eventSource.close()
-  if (pollTimer) clearInterval(pollTimer)
 })
 
 const fetchRecentLogs = async () => {
@@ -276,6 +268,8 @@ const initSSE = () => {
     const msg = event.data
     if (msg.includes('[PROGRESS:')) {
       handleProgressMessage(msg)
+    } else if (msg.includes('[EVENT:')) {
+      handleSystemEvent(msg)
     } else {
       logs.value.push(msg)
       if (logs.value.length > 200) logs.value.shift()
@@ -284,6 +278,20 @@ const initSSE = () => {
   }
   eventSource.onerror = () => {
     console.error('SSE 连接异常')
+  }
+}
+
+const handleSystemEvent = (msg) => {
+  const match = msg.match(/\[EVENT:(.+)\]/)
+  if (!match) return
+  try {
+    const ev = JSON.parse(match[1])
+    if (ev.type === 'stats_update') {
+      // 当统计数据发生变化时（如任务完成、账号更新），刷新仪表盘
+      fetchStats(true)
+    }
+  } catch (e) {
+    console.error('解析系统事件失败:', e)
   }
 }
 

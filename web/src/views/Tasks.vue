@@ -887,14 +887,20 @@ const submitForm = async () => {
   submitting.value = true
   try {
     if (form.value.id) {
-      await updateTask(form.value.id, form.value)
+      const updatedTask = await updateTask(form.value.id, form.value)
+      // 原地更新列表中的任务数据
+      const idx = taskList.value.findIndex(t => t.id === form.value.id)
+      if (idx > -1) {
+        // 合并数据，保留可能需要的关联对象（如 account）
+        Object.assign(taskList.value[idx], updatedTask)
+      }
       ElMessage.success('任务更新成功')
     } else {
       await createTask(form.value)
       ElMessage.success('任务保存成功')
+      fetchList() // 新增任务还是刷新一下列表比较稳妥
     }
     dialogVisible.value = false
-    fetchList()
   } catch (err) {
     console.error(err)
   } finally {
@@ -905,11 +911,11 @@ const submitForm = async () => {
 const handleRun = async (row) => {
   try {
     await runTask(row.id)
+    // 立即在前端反馈状态，避免等待轮询
+    row.status = 'running'
     ElMessage.success('任务已提交执行队列')
   } catch (err) {
     // 错误已由拦截器展示
-  } finally {
-    fetchList()
   }
 }
 
@@ -933,16 +939,58 @@ const formatTime = (timeStr) => {
   return new Date(timeStr).toLocaleString()
 }
 
+let eventSource = null
+
+const initSSE = () => {
+  eventSource = new EventSource('/api/dashboard/logs')
+  eventSource.onmessage = (event) => {
+    const msg = event.data
+    if (msg.includes('[EVENT:')) {
+      const match = msg.match(/\[EVENT:(.+)\]/)
+      if (match) {
+        try {
+          const ev = JSON.parse(match[1])
+          if (ev.type === 'task_update' && ev.task) {
+            const idx = taskList.value.findIndex(t => t.id === ev.task.id)
+            if (idx > -1) {
+              const row = taskList.value[idx]
+              // 手动更新进度相关字段，确保触发响应式，同时防止覆盖 account 信息
+              row.status = ev.task.status
+              row.message = ev.task.message
+              row.last_run = ev.task.last_run
+              row.percent = ev.task.percent
+              row.stage = ev.task.stage
+
+              // 如果任务完成或失败，额外执行一次列表同步以确保最终一致性
+              if (ev.task.status === 'success' || ev.task.status === 'failed') {
+                fetchList(true)
+              }
+            } else {
+              // 如果是新任务且列表里没有（可能是刚创建的），刷新一次列表
+              fetchList()
+            }
+          } else if (ev.type === 'task_delete') {
+            const idx = taskList.value.findIndex(t => t.id === ev.taskId)
+            if (idx > -1) {
+              taskList.value.splice(idx, 1)
+            }
+          }
+        } catch (e) {
+          console.error('解析实时事件失败:', e)
+        }
+      }
+    }
+  }
+}
+
 onMounted(() => {
   fetchList()
   fetchGlobalSettings()
-  pollTimer = setInterval(() => {
-    fetchList(true)
-  }, 5000)
+  initSSE()
 })
 
 onUnmounted(() => {
-  if (pollTimer) clearInterval(pollTimer)
+  if (eventSource) eventSource.close()
 })
 </script>
 
