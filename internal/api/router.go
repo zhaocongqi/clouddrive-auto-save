@@ -63,7 +63,18 @@ func InitRouter(wm *worker.Manager) *gin.Engine {
 
 func clearRecentLogs(c *gin.Context) {
 	utils.GlobalBroadcaster.ClearRecent()
-	c.PureJSON(http.StatusOK, gin.H{"message": "logs cleared"})
+
+	// 同时清理数据库中所有任务的最后运行消息和阶段
+	// 增加 Where("1 = 1") 以绕过 GORM 的 AllowGlobalUpdate 限制
+	db.DB.Model(&db.Task{}).Where("1 = 1").Updates(map[string]interface{}{
+		"message": "",
+		"stage":   "",
+	})
+
+	// 通知前端刷新
+	utils.BroadcastStatsUpdate()
+
+	c.PureJSON(http.StatusOK, gin.H{"message": "logs and task summaries cleared"})
 }
 
 func performAccountCheck(account *db.Account, ctx context.Context) error {
@@ -363,14 +374,19 @@ func getDashboardStats(c *gin.Context) {
 	db.DB.Model(&db.Account{}).Where("status = 1").Count(&activeAccounts)
 
 	var runningTasksList []db.Task
-	// 获取：运行中、15 秒内成功的任务、以及未被忽略（Dismissed）的失败任务
-	db.DB.Where("status = ? OR (status = ? AND last_run >= ?) OR (status = ? AND stage != ?)",
-		"running", "success", time.Now().Add(-15*time.Second), "failed", "Dismissed").Find(&runningTasksList)
+	// 获取：
+	// 1. 正在运行的任务 (running)
+	// 2. 8 秒内成功且消息不为空的任务 (success)
+	// 3. 未被忽略且消息不为空的失败任务 (failed)
+	db.DB.Where("status = ? OR (status = ? AND last_run >= ? AND message != '') OR (status = ? AND stage != ? AND message != '')",
+		"running", "success", time.Now().Add(-8*time.Second), "failed", "Dismissed").Find(&runningTasksList)
 
 	var recentTasks []db.Task
-	db.DB.Order("last_run desc").Limit(15).Find(&recentTasks)
+	// 仅显示有消息记录的任务（配合“清空日志”逻辑）
+	db.DB.Where("message != ''").Order("last_run desc").Limit(15).Find(&recentTasks)
 
 	c.PureJSON(http.StatusOK, gin.H{
+
 		"scheduled_tasks":    scheduledTasks,
 		"capacity_used":      capacityUsed,
 		"today_completed":    todayCompleted,
