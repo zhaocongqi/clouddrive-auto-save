@@ -45,6 +45,7 @@ type Task struct {
 	Filter      string `gorm:"size:500" json:"filter"`       // 过滤规则
 	
 	Cron        string `gorm:"size:100" json:"cron"`         // 任务独立 Cron (可选)
+	ScheduleMode string `gorm:"size:20;default:'global'" json:"schedule_mode"` // global, custom, off
 	StartDate     *time.Time `json:"start_date"`               // 起始日期过滤 (可选)
 	StartFileID   string     `gorm:"size:255" json:"start_file_id"` // 起始文件 ID (可选)
 	StartFileName string     `gorm:"size:255" json:"start_file_name"` // 起始文件名称 (用于前端快速回显)
