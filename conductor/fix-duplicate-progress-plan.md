@@ -1,13 +1,12 @@
-# Fix Duplicate Progress UI Plan
+# 修复监控面板重复任务卡片计划
 
-**Goal:** Fix the issue where clicking "Retry" causes a duplicate progress card to appear (one with the task's real name and one with a "Task #ID" placeholder).
+**目标：** 解决点击“重试”时导致出现重复进度卡片的问题（一个显示真实名称，一个显示“任务 #ID”占位符）。
 
-**Context:** 
-1. When a task is triggered, the SSE progress log (`handleProgressMessage`) creates a new entry in `runningTasks.value` with `id` as a string (`"1"`) and a placeholder name (`"任务 #1"`).
-2. It then calls `fetchStats()`, which gets the `running_tasks_list` from the backend API. The API returns the `id` as a number (`1`) and its real name.
-3. Inside `fetchStats()`, the code checks `runningTasks.value.find(t => t.id === task.id)`. Because it uses strict equality (`===`) and comparing a string (`"1"`) to a number (`1`), it returns `false`.
-4. As a result, `fetchStats` pushes a *second* entry into the array, causing the duplicate UI.
+**背景：**
+1. 当任务被触发时，SSE 进度日志会通过 `handleProgressMessage` 创建一个新条目，此时 `id` 是字符串（如 `"1"`），名称是占位符。
+2. 随后调用 `fetchStats()` 从 API 获取运行列表，API 返回的 `id` 是数字（如 `1`）且带有真实名称。
+3. 由于使用严格相等（`===`）比较字符串 `"1"` 和数字 `1` 返回 `false`，导致系统创建了第二个条目。
 
-**Changes (`web/src/views/Dashboard.vue`):**
-- Update the `find` condition in `fetchStats` to use string conversion: `String(t.id) === String(task.id)`.
-- If the task *does* exist, check if its name starts with `"任务 #"`. If it does, update the placeholder name with the real task name (`task.name`) returned from the backend.
+**修改内容 (`web/src/views/Dashboard.vue`)：**
+- 将 `fetchStats` 中的查找条件更新为字符串转换比较：`String(t.id) === String(task.id)`。
+- 如果任务已存在，检查其名称是否为 `"任务 #"` 开头的占位符。如果是，则用后端返回的真实任务名称更新它。

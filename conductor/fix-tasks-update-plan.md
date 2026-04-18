@@ -1,16 +1,16 @@
-# Fix Tasks UI Reactivity Plan
+# 修复任务管理界面响应式更新计划
 
-**Goal:** Resolve the issue where task statuses in the `Tasks.vue` table do not update automatically via SSE events, forcing the user to manually refresh the page.
+**目标：** 解决 `Tasks.vue` 表格中任务状态无法通过 SSE 事件自动更新，导致用户必须手动刷新页面的问题。
 
-**Context:** 
-The `Tasks.vue` component listens to the `/api/dashboard/logs` SSE stream and attempts to merge incoming `[EVENT:{"type":"task_update",...}]` payloads into the local `taskList.value` array using `Object.assign`. However, if the incoming `task` object from the backend does not have the `Account` relation preloaded, `Object.assign` overwrites the existing `row.account` with a zeroed-out object, potentially breaking the UI or failing to trigger Vue's deep reactivity correctly for the specific `status` and `message` cells.
+**背景：**
+`Tasks.vue` 组件监听 SSE 流并尝试使用 `Object.assign` 将事件负载合并到本地 `taskList.value` 数组中。然而，如果后端返回的任务对象没有预加载 `Account` 关联，`Object.assign` 会用一个零值对象覆盖现有的 `row.account`，这可能破坏 UI 显示，或无法正确触发 Vue 对 `status` 和 `message` 单元格的深层响应式监听。
 
-**Changes (`web/src/views/Tasks.vue`):**
-1. Instead of using a blunt `Object.assign(taskList.value[idx], ev.task)`, selectively update only the progress-related fields that change during execution:
+**修改内容 (`web/src/views/Tasks.vue`)：**
+1. 放弃使用粗暴的 `Object.assign`，改为针对性地更新执行期间会变化的字段：
    - `status`
    - `message`
    - `last_run`
    - `percent`
    - `stage`
-2. This surgical assignment guarantees that Vue 3's proxy intercepts the property mutations and re-renders the specific table cells without destroying nested relational data like `account`.
-3. Add a fallback `fetchList(true)` when a task reaches `Success` or `Failed` to ensure the table reaches a fully consistent state upon task completion.
+2. 这种精确赋值保证了 Vue 3 的 Proxy 能拦截到属性变动并重新渲染特定单元格，同时不会破坏 `account` 等嵌套关联数据。
+3. 在任务达到 `Success` 或 `Failed` 状态时增加一次 `fetchList(true)` 的静默兜底刷新，确保任务完成时全行数据的一致性。

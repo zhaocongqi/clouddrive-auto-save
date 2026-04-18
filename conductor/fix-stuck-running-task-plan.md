@@ -1,12 +1,9 @@
-# Fix Stuck Running Task Plan
+# 修复任务卡在运行中状态计划
 
-**Goal:** Ensure that tasks do not get permanently stuck in the `"running"` state if the backend server is restarted abruptly or crashes.
+**目标：** 确保如果后端服务器异常中断或崩溃，任务不会永久卡在 `"running"` 状态。
 
-**Target File:** `cmd/server/main.go`
-
-**Changes:**
-1. In the backend initialization phase (right after `db.InitDB`), execute a database update query.
-2. Find all tasks with `status = "running"`.
-3. Reset their status to `"pending"` (or `"failed"`) and set a message indicating that the task was interrupted by a server restart.
-   - Example query: `db.DB.Model(&db.Task{}).Where("status = ?", "running").Updates(map[string]interface{}{"status": "pending", "message": "Server restarted during execution"})`
-4. This ensures that when the cron scheduler or the worker manager starts, no phantom running tasks block future executions.
+**修改内容 (`cmd/server/main.go`)：**
+1. 在后端初始化阶段（数据库初始化之后），执行一次数据库更新查询。
+2. 找到所有状态为 `"running"` 的任务。
+3. 将其状态重置为 `"pending"`，并设置提示消息说明任务因服务重启而中断。
+4. 这确保了当调度器启动时，不会有残留的运行状态阻塞未来的执行。
