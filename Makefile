@@ -8,7 +8,7 @@ WEB_DIR = web
 GO_BUILD_FLAGS = -v
 
 # 版本信息
-VERSION ?= $(shell cat VERSION 2>/dev/null || echo "1.0.0")
+VERSION ?= latest
 COMMIT_HASH = $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BUILD_DATE = $(shell date +%FT%T%z)
 LDFLAGS = -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT_HASH) -X main.date=$(BUILD_DATE)
@@ -65,7 +65,12 @@ build: build-server
 ## docker-build: 构建 Docker 镜像
 docker-build:
 	@echo "=> Building Docker image $(DOCKER_IMAGE):$(DOCKER_TAG)..."
-	docker build -t $(DOCKER_IMAGE):$(DOCKER_TAG) -t $(DOCKER_IMAGE):latest .
+	docker build -t $(DOCKER_IMAGE):$(DOCKER_TAG) .
+
+## docker-push: 推送 Docker 镜像到镜像仓库
+docker-push:
+	@echo "=> Pushing Docker image $(DOCKER_IMAGE):$(DOCKER_TAG)..."
+	docker push $(DOCKER_IMAGE):$(DOCKER_TAG)
 
 ## docker-up: 使用 docker-compose 启动服务
 docker-up:

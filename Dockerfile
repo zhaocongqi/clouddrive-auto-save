@@ -2,8 +2,7 @@
 FROM node:20-alpine AS web-builder
 WORKDIR /app/web
 
-# 设置 npm 镜像源并安装依赖 (利用 Docker 缓存)
-RUN npm config set registry https://registry.npmmirror.com
+# 安装依赖 (利用 Docker 缓存)
 COPY web/package*.json ./
 RUN npm install
 
@@ -13,13 +12,10 @@ RUN npm run build
 
 # --- 第二阶段：构建后端 ---
 FROM golang:1.25-alpine AS server-builder
-# 替换 Alpine 镜像源加速
-RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apk/repositories
 
 WORKDIR /app
 
-# 设置 Go 代理并下载依赖 (利用 Docker 缓存)
-ENV GOPROXY=https://goproxy.cn,direct
+# 下载依赖 (利用 Docker 缓存)
 COPY go.mod go.sum ./
 RUN go mod download
 
@@ -30,9 +26,8 @@ RUN go build -tags embed -ldflags="-s -w" -o ucas cmd/server/main.go
 
 # --- 第三阶段：最终镜像 ---
 FROM alpine:latest
-# 替换 Alpine 镜像源加速 apk add
-RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apk/repositories && \
-    apk add --no-cache ca-certificates tzdata
+# 安装运行环境依赖
+RUN apk add --no-cache ca-certificates tzdata
 
 WORKDIR /app
 COPY --from=server-builder /app/ucas .
