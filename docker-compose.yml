@@ -1,6 +1,5 @@
 services:
   ucas:
-    build: .
     image: zcq98/clouddrive-auto-save:latest
     container_name: clouddrive-auto-save
     ports:
