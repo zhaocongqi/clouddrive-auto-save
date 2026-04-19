@@ -18,7 +18,7 @@ Thumbs.db
 
 # Go binaries and tools
 ucas
-server
+/server
 bin/
 *.exe
 *.test
