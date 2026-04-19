@@ -51,3 +51,37 @@ func TestProcessor_Process_MagicVariables(t *testing.T) {
 		})
 	}
 }
+
+func TestProcessor_Process_Regex(t *testing.T) {
+	p := NewProcessor()
+	opts := RenameOptions{
+		Pattern:     `(\d+)\.mp4`,
+		Replacement: "S01E$1.mp4",
+		FileName:    "01.mp4",
+	}
+	got, err := p.Process(opts)
+	if err != nil {
+		t.Fatalf("Process failed: %v", err)
+	}
+	want := "S01E01.mp4"
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestProcessor_Process_Template(t *testing.T) {
+	p := NewProcessor()
+	opts := RenameOptions{
+		Replacement: "{{.TaskName}} - {{.OldName}}",
+		TaskName:    "Series",
+		FileName:    "Ep01.mp4",
+	}
+	got, err := p.Process(opts)
+	if err != nil {
+		t.Fatalf("Process failed: %v", err)
+	}
+	want := "Series - Ep01.mp4"
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
