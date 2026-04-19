@@ -1,6 +1,8 @@
 # 数据库设计说明 (Database Schema)
 
-本项目采用 **SQLite** 作为存储引擎，利用 **GORM** 实现对象关系映射。以下是系统的核心数据表设计及字段说明。
+本项目采用 **SQLite** 作为存储引擎，利用 **GORM** 实现对象关系映射。
+
+为了实现零依赖的跨平台编译与发布，系统采用了 **CGO-free** 的纯 Go 驱动 [github.com/glebarez/sqlite](https://github.com/glebarez/sqlite)，这使得程序可以在没有 C 编译器（如 gcc）的环境下直接运行。
 
 ---
 
