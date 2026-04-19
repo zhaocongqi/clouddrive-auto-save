@@ -22,7 +22,8 @@ RUN go mod download
 # 拷贝源码并编译
 COPY . .
 COPY --from=web-builder /app/web/dist ./internal/api/dist
-RUN go build -tags embed -ldflags="-s -w" -o ucas cmd/server/main.go
+ARG VERSION=latest
+RUN go build -tags embed -ldflags="-s -w -X main.version=${VERSION}" -o ucas cmd/server/main.go
 
 # --- 第三阶段：最终镜像 ---
 FROM alpine:latest

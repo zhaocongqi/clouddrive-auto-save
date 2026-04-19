@@ -12,19 +12,30 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: zcq98
           password: ${{ secrets.DOCKER_SECRET }}
 
-      - name: Calculate Docker Tag
+      - name: Extract Tag
         id: vars
-        run: |
-          echo "TAG_NAME=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+        run: echo "TAG_NAME=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
 
-      - name: Build Docker Image
-        run: make docker-build VERSION=${{ env.TAG_NAME }}
-
-      - name: Push Docker Image
-        run: make docker-push VERSION=${{ env.TAG_NAME }}
+      - name: Build and Push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            zcq98/clouddrive-auto-save:${{ env.TAG_NAME }}
+            zcq98/clouddrive-auto-save:latest
+          build-args: |
+            VERSION=${{ env.TAG_NAME }}
