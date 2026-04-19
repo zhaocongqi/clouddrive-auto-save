@@ -1,0 +1,13 @@
+services:
+  ucas:
+    build: .
+    image: zcq98/clouddrive-auto-save:latest
+    container_name: clouddrive-auto-save
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - LOG_LEVEL=INFO
+      - TZ=Asia/Shanghai
+    restart: unless-stopped

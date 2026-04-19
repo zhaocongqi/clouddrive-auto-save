@@ -7,7 +7,18 @@ APP_NAME = $(BIN_DIR)/ucas
 WEB_DIR = web
 GO_BUILD_FLAGS = -v
 
-.PHONY: all help dev-web dev-server build-web build-server build test clean
+# 版本信息
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "v1.0.0")
+COMMIT_HASH = $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+BUILD_DATE = $(shell date +%FT%T%z)
+LDFLAGS = -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT_HASH) -X main.date=$(BUILD_DATE)
+
+# Docker 配置
+DOCKER_IMAGE = zcq98/clouddrive-auto-save
+DOCKER_TAG = $(VERSION)
+DOCKER_COMPOSE = $(shell command -v docker-compose 2>/dev/null || echo "docker compose")
+
+.PHONY: all help dev-web dev-server build-web build-server build test clean docker-build docker-up docker-down
 
 # 默认执行 help
 all: help
@@ -38,14 +49,34 @@ build-web:
 
 ## build-server: 编译 Go 后端，并将前端资源内嵌 (依赖 build-web)
 build-server: build-web
-	@echo "=> Building backend binary..."
+	@echo "=> Building backend binary ($(VERSION))..."
 	go mod tidy
 	mkdir -p $(BIN_DIR)
-	go build $(GO_BUILD_FLAGS) -o $(APP_NAME) ./cmd/server/main.go
+	go build $(GO_BUILD_FLAGS) -ldflags "$(LDFLAGS)" -o $(APP_NAME) ./cmd/server/main.go
 	@echo "=> Build successful! Binary generated: $(APP_NAME)"
 
 ## build: 完整构建流程的快捷别名 (等同于 build-server)
 build: build-server
+
+# ------------------------------------------
+# 容器化运维 (Docker)
+# ------------------------------------------
+
+## docker-build: 构建 Docker 镜像
+docker-build:
+	@echo "=> Building Docker image $(DOCKER_IMAGE):$(DOCKER_TAG)..."
+	docker build -t $(DOCKER_IMAGE):$(DOCKER_TAG) -t $(DOCKER_IMAGE):latest .
+
+## docker-up: 使用 docker-compose 启动服务
+docker-up:
+	@echo "=> Starting services..."
+	mkdir -p data
+	$(DOCKER_COMPOSE) up -d
+
+## docker-down: 停止并移除容器
+docker-down:
+	@echo "=> Stopping services..."
+	$(DOCKER_COMPOSE) down
 
 # ------------------------------------------
 # 测试与质量检查 (Test & Quality Check)
