@@ -70,9 +70,13 @@ func main() {
 	}
 
 	// 3. 启动 API 服务
-	slog.Info("Starting API server on 127.0.0.1:8080...")
+	listenAddr := os.Getenv("LISTEN_ADDR")
+	if listenAddr == "" {
+		listenAddr = "0.0.0.0:8080"
+	}
+	slog.Info("Starting API server", "addr", listenAddr)
 	r := api.InitRouter(wm)
-	if err := r.Run("127.0.0.1:8080"); err != nil {
+	if err := r.Run(listenAddr); err != nil {
 		slog.Error("Failed to start API server", "error", err)
 		os.Exit(1)
 	}
