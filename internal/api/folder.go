@@ -37,15 +37,25 @@ func getAccountFolders(c *gin.Context) {
 		return
 	}
 
-	// 仅保留文件夹
-	var result []core.FileInfo
+	// 仅保留文件夹并转换为前端 Tree 组件需要的格式
+	var result []map[string]interface{}
 	for _, f := range folders {
 		if f.IsFolder {
-			// 如果是 139，Path 字段可能需要处理
-			if account.Platform == "139" && f.Path == "" {
-				f.Path = f.ID
+			// 基于 parent_path 拼接出完整的绝对路径，确保前端 save_path 显示的是人类可读的路径
+			absPath := f.Name
+			if parentPath != "" && parentPath != "/" && parentPath != "0" && parentPath != "root" {
+				absPath = parentPath + "/" + f.Name
+			} else {
+				absPath = "/" + f.Name
 			}
-			result = append(result, f)
+
+			result = append(result, map[string]interface{}{
+				"id":     f.ID,
+				"name":   f.Name,
+				"label":  f.Name, // 增加 label 字段供前端 Tree 组件使用
+				"path":   absPath,
+				"isLeaf": false, // 统一设为 false 以支持继续展开
+			})
 		}
 	}
 
