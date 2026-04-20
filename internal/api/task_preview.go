@@ -63,8 +63,13 @@ func previewTask(c *gin.Context) {
 
 		// 如果设置了替换规则，计算预览效果
 		if req.Replacement != "" {
+			taskName := req.Name
+			if taskName == "" {
+				taskName = "Task" // 如果未输入任务名，默认使用 Task 占位预览
+			}
+
 			newName, err := processor.Process(renamer.RenameOptions{
-				TaskName:    "Preview", // 预览时临时任务名
+				TaskName:    taskName,
 				FileName:    f.Name,
 				Pattern:     req.Pattern,
 				Replacement: req.Replacement,
