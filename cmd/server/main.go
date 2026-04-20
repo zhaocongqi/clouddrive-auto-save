@@ -58,8 +58,8 @@ func main() {
 	// 加载全局调度设置
 	var enabledSetting db.Setting
 	var cronSetting db.Setting
-	db.DB.Where("key = ?", "global_schedule_enabled").First(&enabledSetting)
-	db.DB.Where("key = ?", "global_schedule_cron").First(&cronSetting)
+	db.DB.Where("key = ?", "global_schedule_enabled").Find(&enabledSetting)
+	db.DB.Where("key = ?", "global_schedule_cron").Find(&cronSetting)
 	scheduler.Global.UpdateGlobalSchedule(cronSetting.Value, enabledSetting.Value == "true")
 
 	// 加载所有任务的调度
