@@ -70,13 +70,6 @@ func previewTask(c *gin.Context) {
 				taskName = "Task" // 如果未输入任务名，默认使用 Task 占位预览
 			}
 
-			newName, err := processor.Process(renamer.RenameOptions{
-				TaskName:    taskName,
-				FileName:    f.Name,
-				Pattern:     req.Pattern,
-				Replacement: req.Replacement,
-			})
-
 			// 判定是否匹配
 			matched := true
 			if req.Pattern != "" {
@@ -87,13 +80,24 @@ func previewTask(c *gin.Context) {
 			}
 			res["matched"] = matched
 
-			if err == nil {
-				res["new_name"] = newName
-				res["is_renamed"] = newName != f.Name
+			if matched {
+				newName, err := processor.Process(renamer.RenameOptions{
+					TaskName:    taskName,
+					FileName:    f.Name,
+					Pattern:     req.Pattern,
+					Replacement: req.Replacement,
+				})
+				if err == nil {
+					res["new_name"] = newName
+					res["is_renamed"] = newName != f.Name
+				} else {
+					res["rename_error"] = err.Error()
+					res["new_name"] = f.Name
+					res["matched"] = false
+				}
 			} else {
-				res["rename_error"] = err.Error()
 				res["new_name"] = f.Name
-				res["matched"] = false
+				res["is_renamed"] = false
 			}
 		} else {
 			res["new_name"] = f.Name
@@ -178,14 +182,26 @@ func parseShareLinkInfo(c *gin.Context) {
 			if taskName == "" {
 				taskName = "Task"
 			}
-			newName, err := processor.Process(renamer.RenameOptions{
-				TaskName:    taskName,
-				FileName:    f.Name,
-				Pattern:     req.Pattern,
-				Replacement: req.Replacement,
-			})
-			if err == nil {
-				f.NewName = newName
+
+			// 判定是否匹配
+			matched := true
+			if req.Pattern != "" {
+				re, err := regexp.Compile(req.Pattern)
+				if err == nil {
+					matched = re.MatchString(f.Name)
+				}
+			}
+
+			if matched {
+				newName, err := processor.Process(renamer.RenameOptions{
+					TaskName:    taskName,
+					FileName:    f.Name,
+					Pattern:     req.Pattern,
+					Replacement: req.Replacement,
+				})
+				if err == nil {
+					f.NewName = newName
+				}
 			}
 		}
 

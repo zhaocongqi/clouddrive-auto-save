@@ -712,13 +712,71 @@ func (q *Quark) SaveLink(ctx context.Context, shareURL, extractCode, targetPath 
 		"pwd_id": pwdID, "stoken": stoken, "pdir_fid": pdirFID, "scene": "link",
 	}
 	jsonSave, _ := json.Marshal(saveBody)
-	_, err = q.doRequest(ctx, "POST", saveURL, nil, strings.NewReader(string(jsonSave)), true)
+	resp, err = q.doRequest(ctx, "POST", saveURL, nil, strings.NewReader(string(jsonSave)), true)
 	if err != nil {
 		slog.Error("夸克转存执行异常", "error", err)
 		return err
 	}
-	slog.Info("夸克转存成功", "count", len(fids), "target_fid", targetID)
+
+	// 解析 TaskID 并等待完成
+	var saveRes struct {
+		Data struct {
+			TaskID string `json:"task_id"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(resp, &saveRes); err == nil && saveRes.Data.TaskID != "" {
+		slog.Info("夸克异步转存已提交", "task_id", saveRes.Data.TaskID)
+		return q.waitTask(ctx, saveRes.Data.TaskID)
+	}
+
+	slog.Info("夸克转存已提交 (未获取到 TaskID)", "count", len(fids), "target_fid", targetID)
 	return nil
+}
+
+func (q *Quark) waitTask(ctx context.Context, taskID string) error {
+	apiURL := BaseURL + "/1/clouddrive/task"
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+
+	timeout := time.After(5 * time.Minute)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-timeout:
+			return fmt.Errorf("夸克转存任务超时: %s", taskID)
+		case <-ticker.C:
+			query := url.Values{}
+			query.Set("task_id", taskID)
+			query.Set("pr", "ucpro")
+			query.Set("fr", "pc")
+
+			resp, err := q.doRequest(ctx, "GET", apiURL, query, nil, false)
+			if err != nil {
+				slog.Warn("轮询夸克任务状态异常", "task_id", taskID, "error", err)
+				continue
+			}
+
+			var res struct {
+				Data struct {
+					Status int    `json:"status"` // 2: 成功, 1: 运行中, 3: 失败?
+					Msg    string `json:"message"`
+				} `json:"data"`
+			}
+			if err := json.Unmarshal(resp, &res); err != nil {
+				return err
+			}
+
+			if res.Data.Status == 2 {
+				slog.Info("夸克异步转存任务已完成", "task_id", taskID)
+				return nil
+			} else if res.Data.Status == 3 || res.Data.Status == 4 {
+				return fmt.Errorf("夸克转存任务失败 [%d]: %s", res.Data.Status, res.Data.Msg)
+			}
+			slog.Debug("夸克转存任务处理中...", "task_id", taskID, "status", res.Data.Status)
+		}
+	}
 }
 
 func (q *Quark) PrepareTargetPath(ctx context.Context, path string) (string, error) {
