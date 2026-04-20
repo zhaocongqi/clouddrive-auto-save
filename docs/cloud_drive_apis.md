@@ -149,9 +149,11 @@
 - **执行保存 (save)**:
   - `POST /1/clouddrive/share/sharepage/save`
   - Body: `{"fid_list": [...], "fid_token_list": [...], "to_pdir_fid": "目标ID", "pwd_id": "...", "stoken": "..."}`
+  - **异步行为**: 该接口返回 `task_id`，文件不会立即进入网盘。
 - **查询异步任务 (task)**:
   - `GET /1/clouddrive/task`
-  - 参数: `task_id`。状态 `2` 表示成功。
+  - 参数: `task_id`。
+  - **自动轮询**: 系统已实现自动轮询机制，当 `status=2` 时表示转存成功，此时才会继续执行后续的重命名逻辑。
 
 ---
 

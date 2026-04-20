@@ -1,36 +1,39 @@
-# 文档同步与优化计划 (Documentation Sync & Optimization Plan)
+# 文档同步更新计划 (Docs Sync Plan)
 
-## 1. Objective (目标)
+**Goal:** 更新 `README.md`、`docs/api/tasks.md` 和 `docs/cloud_drive_apis.md`，使其准确反映近期对转存核心逻辑（时间排序、起始点截断、正则过滤、基于新名去重）以及魔法变量的使用说明。
 
-根据近期完成的“起始转存点秒开优化”、“同名文件自动跳过”以及“139 驱动 Bug 修复”等改动，同步更新项目的相关文档（README、API
-手册、功能清单），确保文档与代码实现保持高度一致。
+---
 
-## 2. Key Files & Context (核心影响文件)
+### Task 1: 更新 Tasks API 文档 (docs/api/tasks.md)
 
-- `README.md`: 增强核心特性描述，加入最新的体验优化与逻辑增强点。
-- `docs/api/tasks.md`: 在任务 Payload 定义中追加 `start_file_name` 字段定义。
-- `FUNCTIONAL_CHECKLIST.md`: 更新各模块的完成状态。
+**Files:**
+- Modify: `docs/api/tasks.md`
 
-## 3. Implementation Steps (实施步骤)
+**Changes:**
+1. 重写 `8. 自动重命名与去重逻辑说明 (Workflow)` 章节，详细描述：
+   - **时间降序排列**: 系统强制按更新时间从新到旧排序。
+   - **双重过滤机制 (AND 关系)**: 明确说明系统仅转存 **“在起始文件之后（含）更新”** 且 **“符合正则匹配规则”** 的文件。
+   - **预测式智能去重**: 描述基于重命名后新名字的预检逻辑。
+2. 增加 **魔法变量 (Magic Variables)** 章节，详细列出 `{TASKNAME}`, `{YEAR}`, `{DATE}`, `{CHINESE}`, `{EXT}` 的提取规则和作用。
 
-### Step 3.1: 更新 README.md
+### Task 2: 更新主 README 文档 (README.md)
 
-1. 在 “核心特性 (Features)” 部分增加以下描述：
-   - **秒开回显**：优化起始转存点加载机制，实现文件名的本地持久化缓存，消除编辑任务时的解析延迟。
-   - **智能去重**：转存前自动预检目标目录，智能跳过同名文件，减少冗余操作并降低风控风险。
-   - **驱动稳定性**：修复 139 移动云盘分享解析的时间格式 Bug，确保文件更新时间显示准确。
+**Files:**
+- Modify: `README.md`
 
-### Step 3.2: 更新 docs/api/tasks.md
+**Changes:**
+1. 新增 **“魔法变量与重命名示例”** 章节，提供直观的示例（如：`[{DATE}] {TASKNAME}.{EXT}`）。
+2. 在核心特性或使用说明中，强调起始点选择与正则匹配之间的 **“与 (AND)”** 关系。
 
-1. 在 “创建新任务” 和 “更新任务配置” 的 Payload 表格中，插入 `start_file_name` 字段。
-2. 说明该字段用于前端快速回显。
+### Task 3: 更新 Cloud Drive APIs 文档 (docs/cloud_drive_apis.md)
 
-### Step 3.3: 更新 FUNCTIONAL_CHECKLIST.md
+**Files:**
+- Modify: `docs/cloud_drive_apis.md`
 
-1. 将 “空间监控” 标记为已完成。
-2. 确保 “增量更新策略” 能够体现出当前的“同名跳过”逻辑加持。
+**Changes:**
+1. 完善夸克网盘 `2.4 分享与转存接口 (PC端)` 中的 `执行保存 (save)` 和 `查询异步任务 (task)` 说明。
+2. 明确标注转存是异步行为，返回 `task_id`，且系统已实现自动轮询机制。
 
-## 4. Verification & Testing (验证与测试)
+### Task 4: 提交更改
 
-- 阅读修改后的 Markdown 文件，确保格式正确、无语法错误。
-- 检查链接与表格对齐情况。
+- 本地提交，不执行推送。
