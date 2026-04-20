@@ -1,11 +1,17 @@
 # 保存路径 UI 优化实施计划 (Save Path UI Optimization Plan)
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use
+superpowers:subagent-driven-development (recommended) or
+superpowers:executing-plans to implement this plan task-by-task. Steps use
+checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 重构任务管理弹窗中的“保存路径”选择交互，将其从受限的下拉树形组件升级为“带前缀的自由输入框 + 独立大屏树形弹窗 + 底部内嵌新建操作”的复合结构。
+**Goal:** 重构任务管理弹窗中的“保存路径”选择交互，将其从受限的下拉树形组件升级为“带前缀的自由输入框 + 独立大屏树形弹窗 +
+底部内嵌新建操作”的复合结构。
 
-**Architecture:** 
-1. 将原有的 `el-tree-select` 替换为 `el-input`。使用插槽 (slots) 添加前缀（显示账号平台如 `[Quark]`）和后缀按钮（“选择目录”）。
+**Architecture:**
+
+1. 将原有的 `el-tree-select` 替换为 `el-input`。使用插槽 (slots) 添加前缀（显示账号平台如
+   `[Quark]`）和后缀按钮（“选择目录”）。
 2. 新增一个专门用于选择目录的 `el-dialog`，内部包含完整的 `el-tree` 组件，以提供更大的可视区域。
 3. 在新弹窗的 `footer` 区域内嵌一个用于新建文件夹的小型表单（输入框+按钮），允许用户在当前选中的树节点下快速创建并立即刷新节点。
 
@@ -13,13 +19,16 @@
 
 ---
 
-### Task 1: 改造表单主界面的输入框
+## Task 1: 改造表单主界面的输入框
 
 **Files:**
+
 - Modify: `web/src/views/Tasks.vue`
 
 - [ ] **Step 1: 替换现有的 el-tree-select**
-  在 `<template>` 中，找到“保存路径”对应的 `el-form-item`。将其内部的 `path-input-group` 替换为带有前后缀插槽的 `el-input`。
+  在 `<template>` 中，找到“保存路径”对应的 `el-form-item`。将其内部的 `path-input-group` 替换为带有前后缀插槽的
+`el-input`。
+
   ```vue
         <el-form-item label="保存路径" required>
           <div class="path-input-group">
@@ -40,7 +49,9 @@
   ```
 
 - [ ] **Step 2: 添加账号平台前缀的计算属性**
-  在 `<script setup>` 中，引入 `computed` 并创建一个计算属性，根据当前选中的 `form.account_id` 匹配出平台的中文名称。
+  在 `<script setup>` 中，引入 `computed` 并创建一个计算属性，根据当前选中的 `form.account_id`
+匹配出平台的中文名称。
+
   ```javascript
   import { ref, onMounted, onUnmounted, computed } from 'vue'
   // ...
@@ -56,6 +67,7 @@
 
 - [ ] **Step 3: 调整样式**
   在 `<style scoped>` 中，为新的输入框添加样式，确保前缀部分具有足够的辨识度。
+
   ```css
   .save-path-input {
     width: 100%;
@@ -70,10 +82,12 @@
 ### Task 2: 实现独立大屏目录选择弹窗
 
 **Files:**
+
 - Modify: `web/src/views/Tasks.vue`
 
 - [ ] **Step 1: 增加目录选择弹窗的模板**
   在 `<template>` 底部（如原有预览对话框上方）增加一个新的 `el-dialog`。
+
   ```vue
       <!-- 目录选择独立弹窗 -->
       <el-dialog 
@@ -128,6 +142,7 @@
 
 - [ ] **Step 2: 声明相关的响应式变量**
   在 `<script setup>` 中添加弹窗所需的控制变量。
+
   ```javascript
   // 独立目录弹窗相关
   const folderDialogVisible = ref(false)
@@ -139,6 +154,7 @@
 
 - [ ] **Step 3: 实现弹窗的打开与确认逻辑**
   编写打开弹窗时初始化状态的逻辑，以及点击确认时将选中的路径回填到主表单的逻辑。
+
   ```javascript
   const openFolderDialog = () => {
     if (!form.value.account_id) {
@@ -165,10 +181,13 @@
 ### Task 3: 改造新建文件夹的交互逻辑
 
 **Files:**
+
 - Modify: `web/src/views/Tasks.vue`
 
 - [ ] **Step 1: 实现内嵌的新建逻辑**
-  使用新的 `handleInlineCreateFolder` 替换掉原先基于 `ElMessageBox.prompt` 的 `handleCreateFolder`。新逻辑将直接在选中的树节点下发送请求，并在成功后动态更新树组件。
+  使用新的 `handleInlineCreateFolder` 替换掉原先基于 `ElMessageBox.prompt` 的
+`handleCreateFolder`。新逻辑将直接在选中的树节点下发送请求，并在成功后动态更新树组件。
+
   ```javascript
   const handleInlineCreateFolder = async () => {
     if (!newFolderName.value.trim()) {
@@ -218,6 +237,7 @@
 
 - [ ] **Step 2: 补充弹窗布局样式**
   在 `<style scoped>` 中添加弹窗内部的布局样式，特别是底部 Footer 的 Flex 布局。
+
   ```css
   .folder-tree-container {
     height: 400px;
@@ -248,15 +268,16 @@
 ### Task 4: 验证与清理
 
 **Files:**
+
 - Modify: `web/src/views/Tasks.vue`
 
 - [ ] **Step 1: 清理旧代码**
   确保彻底移除了旧的 `handleCreateFolder` 函数以及不再使用的导入。
 
 - [ ] **Step 2: 测试全流程**
-  1.  打开任务编辑弹窗。
-  2.  观察“保存路径”输入框前是否有 `[Quark]` 或 `[移动云盘]` 标签。
-  3.  手动在输入框内粘贴或修改一个复杂路径，测试是否能正常保存任务。
-  4.  点击“选择目录”按钮，测试大屏弹窗是否能正常懒加载目录树。
-  5.  选中一个子目录，在弹窗底部输入名字并点击“新建”，测试是否能原地创建并在树中动态显示。
-  6.  点击“确认选择”，测试路径是否能正确回填到输入框。
+  1. 打开任务编辑弹窗。
+  2. 观察“保存路径”输入框前是否有 `[Quark]` 或 `[移动云盘]` 标签。
+  3. 手动在输入框内粘贴或修改一个复杂路径，测试是否能正常保存任务。
+  4. 点击“选择目录”按钮，测试大屏弹窗是否能正常懒加载目录树。
+  5. 选中一个子目录，在弹窗底部输入名字并点击“新建”，测试是否能原地创建并在树中动态显示。
+  6. 点击“确认选择”，测试路径是否能正确回填到输入框。

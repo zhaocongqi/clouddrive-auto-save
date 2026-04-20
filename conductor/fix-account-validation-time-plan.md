@@ -3,6 +3,8 @@
 **目标：** 确保即使账号校验失败，数据库中的 `last_check` 时间戳也会更新。目前失败时仅会将状态设为 0。
 
 **修改内容 (`internal/api/router.go`)：**
+
 1. 在 `performAccountCheck` 函数中，当校验报错时，修改更新逻辑。
-2. 将原本的单字段更新 `Update("status", 0)` 改为多字段更新，同时设置 `status` 为 0 和 `last_check` 为当前时间。
+2. 将原本的单字段更新 `Update("status", 0)` 改为多字段更新，同时设置 `status` 为 0 和 `last_check`
+   为当前时间。
 3. 同时同步更新内存中的账号对象，以便前端能立即回显最新的校验尝试时间。

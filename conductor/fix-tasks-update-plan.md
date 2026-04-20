@@ -3,9 +3,12 @@
 **目标：** 解决 `Tasks.vue` 表格中任务状态无法通过 SSE 事件自动更新，导致用户必须手动刷新页面的问题。
 
 **背景：**
-`Tasks.vue` 组件监听 SSE 流并尝试使用 `Object.assign` 将事件负载合并到本地 `taskList.value` 数组中。然而，如果后端返回的任务对象没有预加载 `Account` 关联，`Object.assign` 会用一个零值对象覆盖现有的 `row.account`，这可能破坏 UI 显示，或无法正确触发 Vue 对 `status` 和 `message` 单元格的深层响应式监听。
+`Tasks.vue` 组件监听 SSE 流并尝试使用 `Object.assign` 将事件负载合并到本地 `taskList.value`
+数组中。然而，如果后端返回的任务对象没有预加载 `Account` 关联，`Object.assign` 会用一个零值对象覆盖现有的
+`row.account`，这可能破坏 UI 显示，或无法正确触发 Vue 对 `status` 和 `message` 单元格的深层响应式监听。
 
 **修改内容 (`web/src/views/Tasks.vue`)：**
+
 1. 放弃使用粗暴的 `Object.assign`，改为针对性地更新执行期间会变化的字段：
    - `status`
    - `message`

@@ -1,11 +1,13 @@
 # 系统设置 (Settings)
 
 ## 1. 获取全局调度设置
+
 获取系统当前的全局定时触发规则及开关状态。
 
 - **URL**: `/settings/schedule`
 - **Method**: `GET`
 - **Response**:
+
 ```json
 {
   "enabled": true,
@@ -16,6 +18,7 @@
 ---
 
 ## 2. 更新全局调度设置
+
 修改全局调度规则。修改后系统会立即更新后台调度引擎。
 
 - **URL**: `/settings/schedule`

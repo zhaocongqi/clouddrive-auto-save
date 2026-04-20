@@ -4,20 +4,25 @@
 
 ---
 
-### Task 1: 自动化目录占位 (Makefile Automation)
+## Task 1: 自动化目录占位 (Makefile Automation)
 
 **Files:**
+
 - Modify: `Makefile`
 
 **Changes:**
-- 在 `build-server` 和 `dev-server` 目标中增加 `mkdir -p internal/api/dist && touch internal/api/dist/.gitkeep` 逻辑。
+
+- 在 `build-server` 和 `dev-server` 目标中增加 `mkdir -p internal/api/dist && touch
+  internal/api/dist/.gitkeep` 逻辑。
 
 ### Task 2: 仓库清理与规范 (Git Cleanup)
 
 **Files:**
+
 - Modify: `.gitignore`
 
 **Changes:**
+
 - 确保 `internal/api/dist/` 下的所有真实内容被忽略，但保留占位文件（可选）或直接忽略整个目录。
 
 ### Task 3: 验证

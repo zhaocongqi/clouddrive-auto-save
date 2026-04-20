@@ -4,22 +4,28 @@
 
 **修改内容：**
 
-### 1. 模块命名优化
+## 1. 模块命名优化
+
 - 将仪表盘右侧卡片标题从“任务执行监控”优化为“实时执行状态”。
 
 ### 2. 布局对齐 (高度一致)
-- **CSS 调整**：为左右两个主卡片 (`terminal-card` 和 `monitor-card`) 增加统一的 `min-height: 500px`。
+
+- **CSS 调整**：为左右两个主卡片 (`terminal-card` 和 `monitor-card`) 增加统一的 `min-height:
+  500px`。
 - **滚动区域**：
   - 左侧终端保持 `450px` 高度并滚动。
   - 为右侧卡片内部增加一个 `monitor-scroll-area`，设置固定高度并支持 `overflow-y: auto`。
 - 效果：无论任务多少，左右两个白色大卡片的底边始终水平对齐。
 
 ### 3. 字体风格统一
+
 - **等宽字体应用**：
-  - 在右侧监控卡片的 `task-name`、`stage-msg` 和 `activity-name` 中引入 `font-family: 'Fira Code', 'Courier New', monospace;`。
+  - 在右侧监控卡片的 `task-name`、`stage-msg` 和 `activity-name` 中引入 `font-family: 'Fira
+    Code', 'Courier New', monospace;`。
   - 这种等宽字体会与左侧日志流形成视觉呼应，强化“实时监控”的专业感。
 
 ### 4. 细节美化
+
 - 缩小右侧进度条的 `stroke-width`（从 10 降到 8），使其看起来更精致。
 - 优化 `el-divider` 的间距。
 - 增加卡片的悬浮阴影效果。

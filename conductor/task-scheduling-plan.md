@@ -3,6 +3,7 @@
 **目标：** 利用 `robfig/cron/v3` 实现“全局默认 + 局部重写”模式的任务调度系统和全局开关。
 
 **架构：**
+
 - 使用新的 `Setting` 模型持久化 `global_schedule_enabled` 和 `global_schedule_cron`。
 - `Task` 模型更新 `ScheduleMode` 字段（`global`, `custom`, `off`）。
 - 调度器维护一个全局 Entry（触发所有“跟随全局”的任务）和多个独立 Entry（用于“自定义”任务）。
@@ -12,9 +13,10 @@
 
 ---
 
-### 任务 1：更新数据库模型
+## 任务 1：更新数据库模型
 
 **涉及文件：**
+
 - 修改：`internal/db/db.go`
 
 - [x] **步骤 1：为 Task 增加 ScheduleMode**
@@ -25,6 +27,7 @@
 ### 任务 2：核心调度器更新
 
 **涉及文件：**
+
 - 修改：`internal/core/scheduler/scheduler.go`
 
 - [x] **步骤 1：更新 Scheduler 结构体**
@@ -35,6 +38,7 @@
 ### 任务 3：API 层集成
 
 **涉及文件：**
+
 - 修改：`internal/api/router.go`
 - 修改：`cmd/server/main.go`
 
@@ -48,6 +52,7 @@
 ### 任务 4：前端 UI 更新
 
 **涉及文件：**
+
 - 修改：`web/src/views/Tasks.vue`
 - 修改：`web/src/api/task.js`
 

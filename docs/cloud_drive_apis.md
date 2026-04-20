@@ -9,6 +9,7 @@
 移动云盘采用多子域名架构，接口分为基础信息、用户节点、分享节点以及私有文件（HCY）节点。
 
 ### 1.1 基础信息与认证
+
 - **主要域名**:
   - 基础/会员: `https://yun.139.com`
   - 用户管理: `https://user-njs.yun.139.com`
@@ -22,7 +23,8 @@
   - `hash` 计算：对 JSON Body 进行序列化 -> URI 编码 -> 字符排序 -> Base64 编码 -> MD5 哈希，再与时间戳+随机串的 MD5 进行二次哈希。
 
 ### 1.2 账号与用户接口
-- **获取用户信息 (getUser)**: 
+
+- **获取用户信息 (getUser)**:
   - `POST /user/getUser` (User Host)
   - **重要返回结构**:
     - `userDomainId`: 用户核心标识（容量查询必填）。
@@ -31,20 +33,21 @@
     - `auth.memberLevel`: 部分版本在此处返回会员等级。
     - `loginName / account / msisdn / phoneNumber`: 用户的真实手机号。
     - `userServiceType`: 用户服务类型标识（如 "8" 代表移动云盘会员）。
-- **获取云盘配额 (个人与家庭)**: 
+- **获取云盘配额 (个人与家庭)**:
   - `POST /user/disk/getPersonalDiskInfo` (获取个人空间)
   - `POST /user/disk/getFamilyDiskInfo` (获取家庭空间)
   - Body: `{"userDomainId": "xxx"}`
   - 返回: `diskSize`, `freeDiskSize` (MB)。系统将两者累加得出真实的总可用空间。
-- **获取会员等级 (queryUserBenefits)**: 
+- **获取会员等级 (queryUserBenefits)**:
   - `POST /orchestration/group-rebuild/member/v1.0/queryUserBenefits` (Base Host)
   - **鉴权要求**: 必须携带 `mcloud-sign` 签名（基于 Body 计算）。
   - Body: `{"isNeedBenefit": 1, "commonAccountInfo": {"account": "手机号", "accountType": 1}}`
-  - **返回解析**: 
+  - **返回解析**:
     - 会员等级从 `data.userSubMemberList[0].memberLvName` 获取（如："白银会员"）。
     - **非会员时**: `data.userSubMemberList` 为空数组 `[]`。
 
 ### 1.3 核心鉴权与异常处理
+
 - **动态签名 (mcloud-sign)**:
   用于 HCY 及 Orchestration 系列接口。
   - **Orchestration 接口签名**: 必须基于请求 Body、当前时间戳及 16 位随机字符串计算二次 MD5 哈希。
@@ -54,27 +57,29 @@
   - `1010010014`: 签名校验失败。
 
 ### 1.3 私有文件操作 (HCY 系列)
-- **文件列表 (list)**: 
+
+- **文件列表 (list)**:
   - `POST /hcy/file/list` (Personal Host)
   - Body: 包含 `parentFileId`, `pageInfo`, `orderBy`。
-- **创建文件夹 (create)**: 
+- **创建文件夹 (create)**:
   - `POST /hcy/file/create` (Personal Host)
   - Body: `{"parentFileId": "...", "name": "...", "type": "folder"}`
-- **重命名 (update)**: 
+- **重命名 (update)**:
   - `POST /hcy/file/update` (Personal Host)
   - Body: `{"fileId": "...", "name": "新名称"}`
-- **删除到回收站 (batchTrash)**: 
+- **删除到回收站 (batchTrash)**:
   - `POST /hcy/recyclebin/batchTrash` (Personal Host)
   - Body: `{"fileIds": ["..."]}`
-- **任务查询 (get)**: 
+- **任务查询 (get)**:
   - `POST /hcy/task/get` (Personal Host)
   - Body: `{"taskId": "..."}`
 
 ### 1.4 分享与转存接口
-- **获取分享详情 (getOutLinkInfoV6)**: 
+
+- **获取分享详情 (getOutLinkInfoV6)**:
   - `POST /yun-share/richlifeApp/devapp/IOutLink/getOutLinkInfoV6` (Share Host)
   - 参数: `linkID`, `passwd`, `pCaID` (根目录为 'root')。
-- **执行批量转存 (createOuterLinkBatchOprTask)**: 
+- **执行批量转存 (createOuterLinkBatchOprTask)**:
   - `POST /yun-share/richlifeApp/devapp/IBatchOprTask/createOuterLinkBatchOprTask` (Share Host)
   - Body: `{"createOuterLinkBatchOprTaskReq": {"msisdn": "手机号", "linkID": "...", "taskInfo": {"newCatalogID": "目标ID", "contentInfoList": ["parentID/fileID"], ...}}}`
 
@@ -85,15 +90,17 @@
 夸克网盘分为 PC 端网页接口和 App 移动端模拟接口。
 
 ### 2.1 基础信息与认证
+
 - **域名**:
   - PC 端: `https://drive-pc.quark.cn`
   - 移动端: `https://drive-m.quark.cn`
-- **认证方式**: 
+- **认证方式**:
   - 主要是 HTTP `Cookie`。
   - 调用移动端接口（容量、签到）需从 Cookie 中提取 `kps`, `sign`, `vcode` 作为 URL 参数。
 
 ### 2.2 账号与用户接口
-- **获取基础信息 (昵称)**: 
+
+- **获取基础信息 (昵称)**:
   - `GET https://pan.quark.cn/account/info`
 - **会员与容量信息 (PC Web端 - 最新推荐)**:
   - `GET https://pan.quark.cn/1/clouddrive/member?pr=ucpro&fr=pc`
@@ -104,43 +111,45 @@
 - **备选容量接口 (PC Web端)**:
   - `GET https://drive-pc.quark.cn/1/clouddrive/capacity?pr=ucpro&fr=pc`
   - 返回: `data.cap_info.total`, `data.cap_info.used`。
-- **会员容量信息 (App端 - 需鉴权参数)**: 
+- **会员容量信息 (App端 - 需鉴权参数)**:
   - `GET /1/clouddrive/capacity/growth/info` (App Host)
   - 参数: `pr=ucpro&fr=android&kps=...&sign=...&vcode=...`
   - 返回: `total_capacity`, `used_capacity`, `member_type`。
-- **每日签到 (App端)**: 
+- **每日签到 (App端)**:
   - `POST /1/clouddrive/capacity/growth/sign` (App Host)
   - Body: `{"sign_cyclic": true}`
 
 ### 2.3 文件操作接口 (PC端)
-- **获取目录列表 (sort)**: 
+
+- **获取目录列表 (sort)**:
   - `GET /1/clouddrive/file/sort`
   - 参数: `pdir_fid` (根目录为 "0"), `_page`, `_size`, `_sort`。
-- **创建文件夹 (mkdir)**: 
+- **创建文件夹 (mkdir)**:
   - `POST /1/clouddrive/file`
   - Body: `{"pdir_fid": "...", "file_name": "...", "dir_path": "..."}`
-- **重命名 (rename)**: 
+- **重命名 (rename)**:
   - `POST /1/clouddrive/file/rename`
   - Body: `{"fid": "...", "file_name": "..."}`
-- **批量删除 (delete)**: 
+- **批量删除 (delete)**:
   - `POST /1/clouddrive/file/delete`
   - Body: `{"action_type": 2, "filelist": ["fid1", "fid2"]}`
-- **路径解析 (path_list)**: 
+- **路径解析 (path_list)**:
   - `POST /1/clouddrive/file/info/path_list`
   - 将绝对路径数组转换为对应的 `fid` 详情。
 
 ### 2.4 分享与转存接口 (PC端)
-- **获取分享 Token (token)**: 
+
+- **获取分享 Token (token)**:
   - `POST /1/clouddrive/share/sharepage/token`
   - Body: `{"pwd_id": "...", "passcode": "..."}`
   - 返回: `stoken`。
-- **获取分享页详情 (detail)**: 
+- **获取分享页详情 (detail)**:
   - `GET /1/clouddrive/share/sharepage/detail`
   - 参数: `pwd_id`, `stoken`, `pdir_fid`。
-- **执行保存 (save)**: 
+- **执行保存 (save)**:
   - `POST /1/clouddrive/share/sharepage/save`
   - Body: `{"fid_list": [...], "fid_token_list": [...], "to_pdir_fid": "目标ID", "pwd_id": "...", "stoken": "..."}`
-- **查询异步任务 (task)**: 
+- **查询异步任务 (task)**:
   - `GET /1/clouddrive/task`
   - 参数: `task_id`。状态 `2` 表示成功。
 
@@ -151,7 +160,9 @@
 本项目所有网盘接口请求均通过 `internal/core/cloud*` 下的底层客户端发出。
 
 ### 3.1 响应日志广播
+
 为了方便排错，系统在底层 `doRequest` 逻辑中统一拦截了原始 JSON 响应。
+
 - **广播机制**: 使用结构化日志系统将原始响应体（Body）发出。
 - **等级控制**: 该类日志已被归类为 `DEBUG` 等级，在默认生产配置 (`LOG_LEVEL=INFO`) 下**不会**打印或广播，以减少噪音并保护隐私。
 - **排错模式**: 若需查看原始 JSON，请在启动时设置环境变量 `LOG_LEVEL=DEBUG`。
@@ -160,14 +171,16 @@
   - `139 API 响应`: 移动云盘接口日志。
 
 ### 3.2 常见错误诊断
+
 - **139 (HCY)**: 若响应包含 `05050009`，通常意味着 `Authorization` 头部失效，需重新抓包。
 - **Quark**: 若响应包含 `401 Unauthorized` 或 `need login`，则 Cookie 已失效。
 - **容量异常**: 139 家庭空间容量若计算不准，请参考 `client.go` 中的累加逻辑，目前系统已实现个人与家庭空间已用容量的汇总。
 
 ### 3.3 人性化错误清洗与分类 (Error Classification)
+
 本项目在驱动层实现了对网盘原始错误码的清洗与映射，确保用户看到的是通俗易懂的语言，而非技术 JSON。
 
-- **致命错误判定 ([Fatal])**: 
+- **致命错误判定 ([Fatal])**:
   - 当驱动检测到不可恢复的业务错误（如链接失效、屏蔽违规、提取码错误）时，会返回带有 `[Fatal]` 前缀的错误信息。
   - **139 致命码**: `200000727` (不存在), `200000728` (提取码错), `200000732` (已过期)。
   - **Quark 致命码**: `41010` (违规), `24000` (提取码错), `24001` (已失效)。

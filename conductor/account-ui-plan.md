@@ -1,21 +1,27 @@
 # 账号管理 UI 重新设计实施计划 (Account Management UI Redesign Plan)
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use
+superpowers:subagent-driven-development (recommended) or
+superpowers:executing-plans to implement this plan task-by-task. Steps use
+checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 优化账号管理页面的 UI。在保持整体表格形态的基础上进行深度美化，并增加渐变进度条及剩余空间提示。保留模态弹窗交互但优化字段布局和说明。
 
-**Architecture:** 
+**Architecture:**
+
 1. **优化版表格 (Enhanced Table)**：对 `el-table` 的列宽、内边距进行调整，可能加入平台图标（Icon）以代替简单的 Tag。
-2. **渐变水平进度条 + 剩余提示**：修改“存储空间”列的自定义模板，将原始容量信息计算出剩余空间，并使用自定义 CSS 样式的渐变色覆盖 `el-progress`。
+2. **渐变水平进度条 + 剩余提示**：修改“存储空间”列的自定义模板，将原始容量信息计算出剩余空间，并使用自定义 CSS 样式的渐变色覆盖
+   `el-progress`。
 3. **模态弹窗 (Dialog)**：优化添加/编辑账号的对话框排版，将帮助信息更好地融入 UI，调整多行文本框的大小和样式。
 
 **Tech Stack:** Vue 3, Element Plus, CSS
 
 ---
 
-### Task 1: 优化表格展示结构与样式
+## Task 1: 优化表格展示结构与样式
 
 **Files:**
+
 - Modify: `web/src/views/Accounts.vue`
 
 - [ ] **Step 1: 引入图标并美化平台列**
@@ -31,10 +37,12 @@
 ### Task 2: 实现进度条渐变及全局样式美化
 
 **Files:**
+
 - Modify: `web/src/views/Accounts.vue`
 
 - [ ] **Step 1: 编写容量文字和渐变进度条样式**
-  - 在 `<style scoped>` 中增加进度条渐变效果。可以通过穿透 `::v-deep(.el-progress-bar__inner)` 来修改背景色为 `linear-gradient(...)`。
+  - 在 `<style scoped>` 中增加进度条渐变效果。可以通过穿透 `::v-deep(.el-progress-bar__inner)`
+    来修改背景色为 `linear-gradient(...)`。
   - 增加文字排版的 Flex 布局，使“已用/总共”和“剩余”分别靠两边对齐。
 
 - [ ] **Step 2: 优化表格和页面整体边距**
@@ -44,6 +52,7 @@
 ### Task 3: 优化编辑/添加弹窗的表单布局
 
 **Files:**
+
 - Modify: `web/src/views/Accounts.vue`
 
 - [ ] **Step 1: 重排表单项**

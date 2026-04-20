@@ -1,21 +1,27 @@
 # 区分文件与文件夹图标 UI 优化计划 (File and Folder Icon UI Optimization Plan)
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use
+superpowers:subagent-driven-development (recommended) or
+superpowers:executing-plans to implement this plan task-by-task. Steps use
+checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 在任务管理界面的“起始转存点”选择表格中，通过直观的图标区分当前项是文件还是文件夹。
 
-**Architecture:** 
+**Architecture:**
+
 1. 依赖底层返回的 `is_folder` 字段。
 2. 在 `web/src/views/Tasks.vue` 中从 `lucide-vue-next` 引入 `Folder` 和 `File` 图标。
-3. 修改显示“从该文件开始”的 `<el-table-column>`，利用 `<template #default="{ row }">` 判断 `row.is_folder` 来渲染对应的图标和颜色。
+3. 修改显示“从该文件开始”的 `<el-table-column>`，利用 `<template #default="{ row }">` 判断
+   `row.is_folder` 来渲染对应的图标和颜色。
 
 **Tech Stack:** Vue 3, Element Plus, Lucide Icons
 
 ---
 
-### Task 1: 引入图标并修改列模板
+## Task 1: 引入图标并修改列模板
 
 **Files:**
+
 - Modify: `web/src/views/Tasks.vue`
 
 - [ ] **Step 1: 引入图标组件**
@@ -23,6 +29,7 @@
 
 - [ ] **Step 2: 自定义文件名列模板**
   在 `<template>` 的分享文件表格中，找到 `prop="name"` 的 `<el-table-column>`，将其改为使用插槽的格式：
+
   ```vue
             <el-table-column label="从该文件开始 (含)" show-overflow-tooltip>
               <template #default="{ row }">
