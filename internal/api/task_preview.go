@@ -3,6 +3,7 @@ package api
 import (
 	"log/slog"
 	"net/http"
+	"regexp"
 
 	"github.com/gin-gonic/gin"
 	"github.com/zcq/clouddrive-auto-save/internal/core"
@@ -50,14 +51,17 @@ func previewTask(c *gin.Context) {
 	for _, f := range files {
 		// 构造预览结果
 		res := map[string]interface{}{
-			"id":        f.ID,
-			"old_name":  f.Name,
-			"is_folder": f.IsFolder,
-			"size":      f.Size,
-			"updated":   f.UpdatedAt,
+			"id":            f.ID,
+			"original_name": f.Name,
+			"is_folder":     f.IsFolder,
+			"size":          f.Size,
+			"updated":       f.UpdatedAt,
 		}
 
-		// 如果设置了重命名规则，计算新名字
+		// 默认状态
+		res["is_filtered"] = false
+
+		// 如果设置了替换规则，计算预览效果
 		if req.Replacement != "" {
 			newName, err := processor.Process(renamer.RenameOptions{
 				TaskName:    "Preview", // 预览时临时任务名
@@ -65,15 +69,29 @@ func previewTask(c *gin.Context) {
 				Pattern:     req.Pattern,
 				Replacement: req.Replacement,
 			})
+
+			// 判定是否匹配
+			matched := true
+			if req.Pattern != "" {
+				re, err := regexp.Compile(req.Pattern)
+				if err == nil {
+					matched = re.MatchString(f.Name)
+				}
+			}
+			res["matched"] = matched
+
 			if err == nil {
 				res["new_name"] = newName
 				res["is_renamed"] = newName != f.Name
 			} else {
 				res["rename_error"] = err.Error()
+				res["new_name"] = f.Name
+				res["matched"] = false
 			}
 		} else {
 			res["new_name"] = f.Name
 			res["is_renamed"] = false
+			res["matched"] = true
 		}
 
 		results = append(results, res)
