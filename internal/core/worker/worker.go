@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"regexp"
+	"sort"
 	"sync"
 	"time"
 
@@ -107,6 +109,27 @@ func (m *Manager) execute(task *db.Task) {
 		return
 	}
 
+	// 2.1 排序：按更新时间从新到旧
+	sort.Slice(files, func(i, j int) bool {
+		return files[i].UpdateTime.After(files[j].UpdateTime)
+	})
+
+	// 2.2 如果有起始文件，执行截断
+	if task.StartFileID != "" {
+		foundIdx := -1
+		for i, f := range files {
+			if f.ID == task.StartFileID {
+				foundIdx = i
+				break
+			}
+		}
+		if foundIdx != -1 {
+			// 仅保留该文件及其之后更新的文件 (即 0 到 foundIdx)
+			files = files[:foundIdx+1]
+			slog.Info("已应用起始文件截断", "task_id", task.ID, "start_file", task.StartFileName, "remaining_count", len(files))
+		}
+	}
+
 	// 3. 列出目标目录文件，进行去重检查
 	m.updateProgress(task, 35, "Checking", "正在检查目标目录是否存在同名文件...")
 	targetID, err := driver.PrepareTargetPath(m.ctx, task.SavePath)
@@ -126,19 +149,56 @@ func (m *Manager) execute(task *db.Task) {
 		existingNames[f.Name] = true
 	}
 
-	// 4. 执行转存
+	// 4. 计算预览名并应用过滤（正则匹配 + 智能去重）
+	processor := renamer.NewProcessor()
 	var filteredIDs []string
 	var skipCount int
+	var regexSkipCount int
+
+	var compiledReg *regexp.Regexp
+	if task.Pattern != "" {
+		compiledReg, _ = regexp.Compile(task.Pattern)
+	}
+
 	for _, f := range files {
-		if existingNames[f.Name] {
+		// a. 正则匹配过滤
+		if compiledReg != nil {
+			if !compiledReg.MatchString(f.Name) {
+				regexSkipCount++
+				continue
+			}
+		}
+
+		// b. 计算预期的新名字
+		newName := f.Name
+		if task.Replacement != "" {
+			resName, err := processor.Process(renamer.RenameOptions{
+				TaskName:    task.Name,
+				FileName:    f.Name,
+				Pattern:     task.Pattern,
+				Replacement: task.Replacement,
+			})
+			if err == nil {
+				newName = resName
+			}
+		}
+
+		// c. 智能去重：拿新名比对
+		if existingNames[newName] {
 			skipCount++
 			continue
 		}
+
 		filteredIDs = append(filteredIDs, f.ID)
 	}
 
 	if len(filteredIDs) == 0 {
-		m.finishTask(task, "success", fmt.Sprintf("无新文件需要转存 (已跳过 %d 个同名文件)", skipCount))
+		msg := fmt.Sprintf("没有需要转存的文件 (跳过 %d 个同名文件", skipCount)
+		if regexSkipCount > 0 {
+			msg += fmt.Sprintf(", 过滤 %d 个不匹配文件", regexSkipCount)
+		}
+		msg += ")"
+		m.finishTask(task, "success", msg)
 		return
 	}
 

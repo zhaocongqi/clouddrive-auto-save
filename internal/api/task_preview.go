@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"net/http"
 	"regexp"
+	"sort"
 
 	"github.com/gin-gonic/gin"
 	"github.com/zcq/clouddrive-auto-save/internal/core"
@@ -19,6 +20,7 @@ func previewTask(c *gin.Context) {
 		SavePath    string `json:"save_path"`
 		Pattern     string `json:"pattern"`
 		Replacement string `json:"replacement"`
+		Name        string `json:"name"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -112,6 +114,9 @@ func parseShareLinkInfo(c *gin.Context) {
 		ShareURL    string `json:"share_url"`
 		ExtractCode string `json:"extract_code"`
 		SavePath    string `json:"save_path"`
+		Pattern     string `json:"pattern"`
+		Replacement string `json:"replacement"`
+		Name        string `json:"name"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -134,6 +139,7 @@ func parseShareLinkInfo(c *gin.Context) {
 		return
 	}
 
+	// 1. 获取分享内容
 	files, err := driver.ParseShare(c.Request.Context(), req.ShareURL, req.ExtractCode)
 	if err != nil {
 		slog.Error("解析失败", "error", err)
@@ -141,15 +147,54 @@ func parseShareLinkInfo(c *gin.Context) {
 		return
 	}
 
-	// 针对 139，如果 SavePath 包含通配符或需要自动匹配，我们在此可以做预处理
-	// 目前仅简单返回列表
+	// 2. 排序：按更新时间从新到旧
+	sort.Slice(files, func(i, j int) bool {
+		return files[i].UpdateTime.After(files[j].UpdateTime)
+	})
 
-	// 过滤并排序（可选，前端通常会处理）
-	var result []core.FileInfo = files
+	// 3. 获取目标目录列表，准备去重 Map
+	existingNames := make(map[string]bool)
+	targetID, err := driver.PrepareTargetPath(c.Request.Context(), req.SavePath)
+	if err == nil {
+		existingFiles, err := driver.ListFiles(c.Request.Context(), targetID)
+		if err == nil {
+			for _, f := range existingFiles {
+				existingNames[f.Name] = true
+			}
+		}
+	}
 
-	// 针对 Quark 的特殊处理：如果用户提供了 SavePath 且包含 ID，我们可以在此进行映射
-	// ... (现有逻辑暂无)
+	// 4. 重命名预览与去重比对
+	processor := renamer.NewProcessor()
+	for i := range files {
+		f := &files[i]
+
+		// 默认预览名
+		f.NewName = f.Name
+
+		// 如果有规则，计算预览名
+		if req.Replacement != "" {
+			taskName := req.Name
+			if taskName == "" {
+				taskName = "Task"
+			}
+			newName, err := processor.Process(renamer.RenameOptions{
+				TaskName:    taskName,
+				FileName:    f.Name,
+				Pattern:     req.Pattern,
+				Replacement: req.Replacement,
+			})
+			if err == nil {
+				f.NewName = newName
+			}
+		}
+
+		// 同名预检：拿 NewName 去比对
+		if existingNames[f.NewName] {
+			f.IsExisted = true
+		}
+	}
 
 	slog.Info("解析完成", "item_count", len(files))
-	c.JSON(http.StatusOK, result)
+	c.JSON(http.StatusOK, files)
 }
