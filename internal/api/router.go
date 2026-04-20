@@ -321,6 +321,9 @@ func updateTask(c *gin.Context) {
 		return
 	}
 
+	// 重新加载以获取关联的 Account 信息
+	db.DB.Preload("Account").First(&task, task.ID)
+
 	// 推送更新事件
 	utils.BroadcastTaskUpdate(&task)
 
