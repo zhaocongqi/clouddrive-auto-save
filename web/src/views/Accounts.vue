@@ -20,7 +20,7 @@
 
     <!-- 表格视图 -->
     <el-card v-if="viewMode === 'table'" class="table-card">
-      <el-table :data="accountList" v-loading="loading" style="width: 100%">
+      <el-table v-if="accountList.length > 0 || loading" :data="accountList" v-loading="loading" style="width: 100%">
         <el-table-column label="平台" width="140">
           <template #default="{ row }">
             <div class="platform-cell">
@@ -85,72 +85,79 @@
           </template>
         </el-table-column>
       </el-table>
+      <el-empty v-else description="您还没有绑定任何云盘账号">
+        <el-button type="primary" :icon="Plus" @click="openAddDialog">立即绑定账号</el-button>
+      </el-empty>
     </el-card>
 
     <!-- 卡片视图 -->
     <div v-else class="card-view-container" v-loading="loading">
-      <el-row :gutter="20">
-        <el-col v-for="row in accountList" :key="row.id" :xs="24" :sm="12" :md="8" :lg="6">
-          <el-card class="account-card" body-style="padding: 20px">
-            <div class="card-header">
-              <div class="card-title">
-                <el-icon :class="row.platform" class="platform-icon mini">
-                  <HardDrive />
-                </el-icon>
-                <div class="account-info">
-                  <div class="nickname">{{ row.nickname }}</div>
-                  <div class="platform-tag">{{ row.platform === 'quark' ? '夸克网盘' : '移动云盘' }}</div>
+      <template v-if="accountList.length > 0 || loading">
+        <el-row :gutter="20">
+          <el-col v-for="row in accountList" :key="row.id" :xs="24" :sm="12" :md="8" :lg="6">
+            <el-card class="account-card" body-style="padding: 20px">
+              <div class="card-header">
+                <div class="card-title">
+                  <el-icon :class="row.platform" class="platform-icon mini">
+                    <HardDrive />
+                  </el-icon>
+                  <div class="account-info">
+                    <div class="nickname">{{ row.nickname }}</div>
+                    <div class="platform-tag">{{ row.platform === 'quark' ? '夸克网盘' : '移动云盘' }}</div>
+                  </div>
                 </div>
+                <el-tag :type="row.status === 1 ? 'success' : 'danger'" size="small" effect="light" round>
+                  {{ row.status === 1 ? '正常' : '失效' }}
+                </el-tag>
               </div>
-              <el-tag :type="row.status === 1 ? 'success' : 'danger'" size="small" effect="light" round>
-                {{ row.status === 1 ? '正常' : '失效' }}
-              </el-tag>
-            </div>
 
-            <div class="card-content">
-              <div v-if="row.capacity_total > 0" class="capacity-section">
-                <div class="capacity-header">
-                  <span>{{ formatBytes(row.capacity_used) }} / {{ formatBytes(row.capacity_total) }}</span>
-                  <span v-if="row.capacity_total >= row.capacity_used" class="remaining">
-                    剩 {{ formatBytes(row.capacity_total - row.capacity_used) }}
-                  </span>
-                  <span v-else class="remaining is-over">
-                    已超额 {{ formatBytes(row.capacity_used - row.capacity_total) }}
-                  </span>
+              <div class="card-content">
+                <div v-if="row.capacity_total > 0" class="capacity-section">
+                  <div class="capacity-header">
+                    <span>{{ formatBytes(row.capacity_used) }} / {{ formatBytes(row.capacity_total) }}</span>
+                    <span v-if="row.capacity_total >= row.capacity_used" class="remaining">
+                      剩 {{ formatBytes(row.capacity_total - row.capacity_used) }}
+                    </span>
+                    <span v-else class="remaining is-over">
+                      已超额 {{ formatBytes(row.capacity_used - row.capacity_total) }}
+                    </span>
+                  </div>
+                  <el-progress 
+                    :percentage="Math.min(100, calcPercentage(row.capacity_used, row.capacity_total))" 
+                    :show-text="false"
+                    :stroke-width="8"
+                    :status="getCapacityStatus(row.capacity_used, row.capacity_total)"
+                    class="gradient-progress"
+                  />
                 </div>
-                <el-progress 
-                  :percentage="Math.min(100, calcPercentage(row.capacity_used, row.capacity_total))" 
-                  :show-text="false"
-                  :stroke-width="8"
-                  :status="getCapacityStatus(row.capacity_used, row.capacity_total)"
-                  class="gradient-progress"
-                />
-              </div>
-              <div v-else class="empty-capacity">
-                <el-icon><Info /></el-icon> 未同步容量信息
-              </div>
-              
-              <div class="meta-info">
-                <div class="meta-item" v-if="row.vip_name">
-                  <span class="label">会员状态</span>
-                  <el-tag size="small" type="warning" effect="plain">{{ row.vip_name }}</el-tag>
+                <div v-else class="empty-capacity">
+                  <el-icon><Info /></el-icon> 未同步容量信息
                 </div>
-                <div class="meta-item">
-                  <span class="label">最后校验</span>
-                  <span class="value">{{ formatTime(row.last_check) }}</span>
+                
+                <div class="meta-info">
+                  <div class="meta-item" v-if="row.vip_name">
+                    <span class="label">会员状态</span>
+                    <el-tag size="small" type="warning" effect="plain">{{ row.vip_name }}</el-tag>
+                  </div>
+                  <div class="meta-item">
+                    <span class="label">最后校验</span>
+                    <span class="value">{{ formatTime(row.last_check) }}</span>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div class="card-footer">
-              <el-button type="primary" link :icon="RefreshCcw" @click="handleCheck(row)">校验</el-button>
-              <el-button type="primary" link :icon="Edit" @click="handleEdit(row)">编辑</el-button>
-              <el-button type="danger" link :icon="Trash2" @click="handleDelete(row)">删除</el-button>
-            </div>
-          </el-card>
-        </el-col>
-      </el-row>
-      <el-empty v-if="!loading && accountList.length === 0" description="暂无账号" />
+              <div class="card-footer">
+                <el-button type="primary" link :icon="RefreshCcw" @click="handleCheck(row)">校验</el-button>
+                <el-button type="primary" link :icon="Edit" @click="handleEdit(row)">编辑</el-button>
+                <el-button type="danger" link :icon="Trash2" @click="handleDelete(row)">删除</el-button>
+              </div>
+            </el-card>
+          </el-col>
+        </el-row>
+      </template>
+      <el-empty v-else description="您还没有绑定任何云盘账号">
+        <el-button type="primary" :icon="Plus" @click="openAddDialog">立即绑定账号</el-button>
+      </el-empty>
     </div>
 
     <!-- 添加账号对话框 -->
@@ -174,13 +181,31 @@
             show-icon
             style="margin-bottom: 18px"
           >
-            建议优先使用 <b>Authorization</b> (Basic 格式)，它能提供更长久的登录有效期且支持更多高级功能。
+            建议优先使用 <b>Authorization</b> (Basic 格式)，它能提供更长久的有效期且支持更多高级功能。
+            <el-link type="primary" :underline="false" href="https://doc.oplist.org/guide/drivers/139#authorization-1" target="_blank" style="margin-left: 8px; font-weight: bold; vertical-align: baseline;">
+              查看教程 <el-icon><ExternalLink /></el-icon>
+            </el-link>
           </el-alert>
           <el-form-item label="Authorization">
-            <el-input v-model="accountForm.auth_token" type="textarea" :rows="3" placeholder="格式如：Basic pc:138...:xxxxx" />
+            <el-input v-model="accountForm.auth_token" type="textarea" :rows="3" placeholder="只需要填写 Basic 空格后面开始的内容，不要包含 Basic！" />
           </el-form-item>
           <div class="form-or-divider">或</div>
         </template>
+
+        <!-- 夸克特有提示 -->
+        <el-alert
+          v-if="accountForm.platform === 'quark'"
+          title="使用须知"
+          type="info"
+          :closable="false"
+          show-icon
+          style="margin-bottom: 18px"
+        >
+          夸克网盘仅支持 Cookie 认证。
+          <el-link type="primary" :underline="false" href="https://doc.oplist.org/guide/drivers/quark#cookie-1" target="_blank" style="margin-left: 8px; font-weight: bold; vertical-align: baseline;">
+            如何获取？ <el-icon><ExternalLink /></el-icon>
+          </el-link>
+        </el-alert>
 
         <el-form-item label="Cookie 全量字符串">
           <el-input v-model="accountForm.cookie" type="textarea" :rows="4" placeholder="通过浏览器 F12 网络选项卡获取" />
@@ -196,7 +221,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { Plus, RefreshCcw, Trash2, Edit, HardDrive, Info, LayoutGrid, List } from 'lucide-vue-next'
+import { Plus, RefreshCcw, Trash2, Edit, HardDrive, Info, LayoutGrid, List, ExternalLink } from 'lucide-vue-next'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getAccounts, createAccount, updateAccount, deleteAccount, checkAccount } from '../api/account'
 
@@ -561,6 +586,22 @@ html.dark .title-section h2 {
 
 .account-form {
   padding: 0 10px;
+}
+
+.form-label-with-link {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.help-link {
+  font-size: 12px;
+  font-weight: normal;
+}
+
+.help-link .el-icon {
+  margin-right: 4px;
 }
 
 .form-or-divider {

@@ -3,7 +3,7 @@
     <div class="page-header">
       <div class="title-section">
         <h2>任务管理</h2>
-        <p>监控并自动转存 139 和 Quark 的分享资源</p>
+        <p>监控并自动转存移动云盘和夸克网盘的分享资源</p>
       </div>
       <div class="header-actions">
         <el-popconfirm
@@ -73,7 +73,7 @@
     </el-card>
 
     <el-card class="table-card">
-      <el-table :data="taskList" v-loading="loading" style="width: 100%">
+      <el-table v-if="taskList.length > 0 || loading" :data="taskList" v-loading="loading" style="width: 100%">
         <el-table-column label="任务名称" min-width="180">
           <template #default="{ row }">
             <div class="task-name-cell">
@@ -144,6 +144,9 @@
           </template>
         </el-table-column>
       </el-table>
+      <el-empty v-else description="当前没有任何转存任务">
+        <el-button type="primary" :icon="Plus" @click="openAddDialog">创建新任务</el-button>
+      </el-empty>
     </el-card>
 
     <!-- 创建/编辑任务对话框 -->
