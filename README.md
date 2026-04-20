@@ -12,43 +12,17 @@
 
 ## ✨ 核心特性 (Features)
 
-* **⚡ 高性能引擎**：基于 Go Goroutine 实现的并发 Worker 池，支持多任务同时转存。
-* **🛠️ 跨平台兼容**：采用 **CGO-free** 的纯 Go SQLite 驱动，支持 Windows/Linux/macOS 零依赖部署。支持通过 GitHub Releases 下载预编译好的二进制程序。
-* **🎨 现代化 UI**：采用 Vue 3 + Element Plus 构建的响应式后台，支持暗黑模式与等宽日志视图。
-* **📊 实时指挥中心**：集成实时数据仪表盘，通过 **Server-Sent Events (SSE)** 实现任务状态与日志的绝对实时同步。
+*   **⚡ 高性能引擎**：基于 Go Goroutine 实现的并发 Worker 池，支持多任务同时转存。
+*   **🛠️ 跨平台兼容**：采用 **CGO-free** 的纯 Go SQLite 驱动，支持 Windows/Linux/macOS 零依赖部署。支持通过 GitHub Releases 下载预编译好的二进制程序。
+*   **🎨 现代化 UI**：采用 Vue 3 + Element Plus 构建的响应式后台，支持暗黑模式与等宽日志视图。
+*   **📊 实时指挥中心**：集成实时数据仪表盘，通过 **Server-Sent Events (SSE)** 实现任务状态与日志的绝对实时同步。
 *   **🤖 智能整理与去重**：
     *   **正则重命名**：支持强大的正则匹配与替换（含 `{TASKNAME}`, `{DATE}` 等魔法变量）。
     *   **智能去重**：转存前自动预检目标目录，智能跳过同名文件，防止产生冗余副本。
     *   **可视化解析**：支持解析分享链接，允许手动选择起始转存点。
-    *   **双重过滤机制**：系统仅转存 **“在起始文件之后（含）更新”** 且 **“符合正则匹配”** 的文件（两者为“与”关系）。
-
----
-
-## 🔮 魔法变量与重命名示例
-
-魔法变量允许您通过简单的占位符实现自动整理。其核心区别在于：`{TASKNAME}` 是您**手动定义**的，而其他变量是**自动从原文件名中抓取**的。
-
-### 变量提取说明 (假设任务名为：`经典电影`)
-
-| 变量 | 来源/逻辑 | 示例 (原名: `[2024.04.20] 功夫熊猫4.mp4`) |
-| :--- | :--- | :--- |
-| `{TASKNAME}` | **任务显示名称** | `经典电影` (您在创建任务时填写的名字) |
-| `{CHINESE}` | 提取文件名中的连续中文 | `功夫熊猫` |
-| `{DATE}` | 提取日期并清洗为纯数字 | `20240420` |
-| `{YEAR}` | 提取 4 位年份数字 | `2024` |
-| `{EXT}` | 提取原始文件后缀 | `mp4` |
-
-### 常用组合示例
-
-*   **场景 1：统一标题归档**
-    *   **替换规则**: `[{DATE}] {TASKNAME}.{EXT}`
-    *   **效果**: `[极速版] 2024.04.20 功夫熊猫4.mp4` ➡️ `[20240420] 经典电影.mp4`
-*   **场景 2：保留原始中文标题**
-    *   **替换规则**: `{CHINESE}.{EXT}`
-    *   **效果**: `Kung.Fu.Panda.4.2024.功夫熊猫4.1080p.mkv` ➡️ `功夫熊猫.mkv`
-
-* **⏰ 灵活调度**：支持“全局默认”与“任务自定义”双层 Cron 调度逻辑。
-* **📦 容器化优先**：提供官方 Docker 镜像，支持 **多架构 / 异构镜像 (amd64 / arm64)**，适配树莓派、Mac M系列等 ARM 设备。支持 GitHub Actions 自动构建与发布。
+    *   **双重过滤机制**：系统仅转存 **“在起始文件之后（含）更新”** 且 **“符合正则匹配”** 的文件。
+*   **⏰ 灵活调度**：支持“全局默认”与“任务自定义”双层 Cron 调度逻辑。
+*   **📦 容器化优先**：提供官方 Docker 镜像，支持 **多架构 / 异构镜像 (amd64 / arm64)**，适配树莓派、Mac M系列等 ARM 设备。
 
 ---
 
@@ -83,42 +57,61 @@ services:
       - TZ=Asia/Shanghai
 ```
 
-### 方式二：直接下载
+### 方式二：直接下载产物
 
-前往 [GitHub Releases](https://github.com/zhaocongqi/clouddrive-auto-save/releases) 页面，下载适合您操作系统和架构的预编译压缩包，解压后即可运行。
+前往 [GitHub Releases](https://github.com/zhaocongqi/clouddrive-auto-save/releases) 页面，下载适合您操作系统和架构的预编译压缩包，解压后即可直接运行。
 
-### 方式三：本地编译
+### 方式三：源码编译
 
-1. **克隆仓库**: `git clone https://github.com/zhaocongqi/clouddrive-auto-save.git`
-2. **一键构建**: `make build` (依赖 Node.js 和 Go 环境)
-3. **运行**: `./bin/ucas`
-
----
-
-## 🏗️ 技术架构 (Architecture)
-
-* **Backend**: Go 1.25, Gin, GORM, **Glebarez SQLite (CGO-free)**.
-* **Frontend**: Vue 3, Vite, Element Plus.
-* **CI/CD**: GitHub Actions (使用 Docker Buildx 构建多架构镜像，并使用 **GoReleaser** 自动发布多平台二进制产物)。
+1.  **克隆仓库**: `git clone https://github.com/zhaocongqi/clouddrive-auto-save.git`
+2.  **一键构建**: `make build` (依赖 Node.js 和 Go 环境)
+3.  **运行**: `./bin/ucas`
 
 ---
 
 ## ⚙️ 配置说明 (Configuration)
+
+系统支持通过环境变量进行微调：
 
 | 变量 | 说明 | 默认值 |
 | :--- | :--- | :--- |
 | `LOG_LEVEL` | 日志等级 (`DEBUG`, `INFO`, `WARN`, `ERROR`) | `INFO` |
 | `DB_PATH` | SQLite 数据库文件路径 | `/app/data/data.db` |
 | `LISTEN_ADDR` | 服务监听地址与端口 | `0.0.0.0:8080` |
-| `TZ` | 系统时区（主要用于 Docker 内部日志时间对齐） | `Asia/Shanghai` |
+| `TZ` | 系统时区（主要用于日志时间与定时任务对齐） | `Asia/Shanghai` |
 
 ---
 
-## 🛠️ Makefile 指令
+## 🔮 魔法变量与重命名示例
 
-* **`make build`**：完整构建（前端构建 + 后端内嵌编译）。
-* **`make check`**：执行 lint、vet 和单元测试。
-* **`make docker-build`**：本地构建 Docker 镜像。
+魔法变量允许您通过简单的占位符实现自动整理。其核心区别在于：`{TASKNAME}` 是您**手动定义**的，而其他变量是**自动从原文件名中抓取**的。
+
+### 变量提取说明 (假设任务名为：`经典电影`)
+
+| 变量 | 来源/逻辑 | 示例 (原名: `[2024.04.20] 功夫熊猫4.mp4`) |
+| :--- | :--- | :--- |
+| `{TASKNAME}` | **任务显示名称** | `经典电影` (您在创建任务时填写的名字) |
+| `{CHINESE}` | 提取文件名中的连续中文 | `功夫熊猫` |
+| `{DATE}` | 提取日期并清洗为纯数字 | `20240420` |
+| `{YEAR}` | 提取 4 位年份数字 | `2024` |
+| `{EXT}` | 提取原始文件后缀 | `mp4` |
+
+### 常用组合示例
+
+*   **场景 1：统一标题归档**
+    *   **替换规则**: `[{DATE}] {TASKNAME}.{EXT}`
+    *   **效果**: `[极速版] 2024.04.20 功夫熊猫4.mp4` ➡️ `[20240420] 经典电影.mp4`
+*   **场景 2：保留原始中文标题**
+    *   **替换规则**: `{CHINESE}.{EXT}`
+    *   **效果**: `Kung.Fu.Panda.4.2024.功夫熊猫4.1080p.mkv` ➡️ `功夫熊猫.mkv`
+
+---
+
+## 🏗️ 技术架构 (Architecture)
+
+*   **Backend**: Go 1.25, Gin, GORM, **Glebarez SQLite (CGO-free)**.
+*   **Frontend**: Vue 3, Vite, Element Plus.
+*   **CI/CD**: GitHub Actions (使用 Docker Buildx 构建多架构镜像，并使用 **GoReleaser** 自动发布多平台产物)。
 
 ---
 
@@ -126,6 +119,26 @@ services:
 
 更多细节请参考 [docs/](docs/) 目录：
 
-* [API 接口文档](docs/api/README.md)
-* [云盘底层 API 手册](docs/cloud_drive_apis.md)
-* [数据库设计](docs/api/database.md)
+*   [API 接口文档](docs/api/README.md)
+*   [云盘底层 API 手册](docs/cloud_drive_apis.md)
+*   [数据库设计](docs/api/database.md)
+
+---
+
+## 🛠️ Makefile 指令
+
+*   **`make build`**：完整构建（前端构建 + 后端内嵌编译）。
+*   **`make check`**：执行 lint、vet 和单元测试。
+*   **`make docker-build`**：本地构建 Docker 镜像。
+
+---
+
+## 🤝 贡献与反馈
+
+如果您在使用过程中发现 Bug 或有新的建议，欢迎提交 Issue。
+
+---
+
+## 📄 开源协议
+
+基于 [MIT License](LICENSE) 协议。

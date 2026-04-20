@@ -1,32 +1,25 @@
-# README 全量更新计划 (Comprehensive README Update Plan)
+# README 排版优化计划 (README Reorder Plan)
 
-**Goal:** 全面检查并更新 `README.md`，使其准确反映近期项目引入的各项重要能力（异构镜像支持、GoReleaser
-自动发布等），并补全缺失的环境变量说明。
+**Goal:** 重新编排 `README.md` 的章节顺序，使其更符合用户从安装到使用的逻辑流。将配置与使用技巧前置，技术架构后置。
 
 ---
 
-## Task 1: 更新特性描述与配置说明
+### Task 1: 全量重写 README.md
 
 **Files:**
-
 - Modify: `README.md`
 
-**Changes:**
+**New Structure:**
+1.  **🚀 Unified CloudDrive Auto-Save (UCAS)**: 项目标题与徽章。
+2.  **✨ 核心特性 (Features)**: 展示项目核心能力。
+3.  **🚀 快速开始 (Quick Start)**: 提供 Docker、下载产物、源码编译三种安装路径。
+4.  **⚙️ 配置说明 (Configuration)**: 紧接安装步骤，提供环境变量参考。
+5.  **🔮 魔法变量与重命名示例**: 核心功能的使用深度指南。
+6.  **🏗️ 技术架构 (Architecture)**: 技术栈说明。
+7.  **📖 详细文档**: API 与底层手册链接。
+8.  **🛠️ Makefile 指令**: 开发维护。
+9.  **🤝 贡献与反馈 / 📄 开源协议**
 
-1. **核心特性 - 跨平台兼容**: 补充说明现在支持通过 GitHub Releases 直接下载各平台（Windows, Mac,
-   Linux）预编译好的独立二进制程序。
-2. **核心特性 - 容器化优先**: 明确标注官方 Docker 镜像现已支持 **多架构 / 异构镜像 (amd64 /
-   arm64)**，支持树莓派、Mac M系列等 ARM 设备部署。
-3. **技术架构 - CI/CD**: 将“自动构建 amd64 镜像”的描述更新为包含“多架构(amd64/arm64)镜像”以及“GoReleaser
-   全自动跨平台编译发布”。
-4. **配置说明 (Configuration)**: 补充缺失的 `LISTEN_ADDR`（API 监听地址与端口）以及常用的 `TZ`（时区）环境变量。
-
-### Task 2: 补充“快速开始”下载方式
-
-**Files:**
-
-- Modify: `README.md`
-
-**Changes:**
-
-1. 在“快速开始”中增加“方式三：直接下载预编译程序”，引导用户前往 GitHub Releases 页面下载由 GoReleaser 自动打包的产物。
+### Task 2: 提交与推送
+- 提交 README 优化。
+- 执行远程推送。
