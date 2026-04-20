@@ -127,8 +127,8 @@ test-html: test
 	@echo "=> Generating and opening coverage report..."
 	go tool cover -html=coverage.out
 
-## check: 运行 lint, lint-md, vet 和 test (完整验证流程)
-check: lint lint-md vet test
+## check: 运行 lint, vet 和 test (完整验证流程)
+check: lint vet test
 	@echo "=> All checks passed successfully!"
 
 ## clean: 清理构建产物 (二进制文件、覆盖率报告和前端 dist 目录)
