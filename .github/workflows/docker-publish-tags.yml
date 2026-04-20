@@ -5,12 +5,25 @@ on:
     tags:
       - 'v*'
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   docker:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: zcq98/clouddrive-auto-save
+          tags: |
+            type=semver,pattern={{version}}
+            type=raw,value=latest
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -24,9 +37,9 @@ jobs:
           username: zcq98
           password: ${{ secrets.DOCKER_SECRET }}
 
-      - name: Extract Tag
+      - name: Extract Tag Version
         id: vars
-        run: echo "TAG_NAME=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+        run: echo "VERSION_NAME=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
 
       - name: Build and Push
         uses: docker/build-push-action@v5
@@ -34,8 +47,7 @@ jobs:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: |
-            zcq98/clouddrive-auto-save:${{ env.TAG_NAME }}
-            zcq98/clouddrive-auto-save:latest
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            VERSION=${{ env.TAG_NAME }}
+            VERSION=${{ env.VERSION_NAME }}
