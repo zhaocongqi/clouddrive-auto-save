@@ -5,10 +5,8 @@ on:
     branches:
       - main
     paths-ignore:
-      - 'docs/**'
-      - 'conductor/**'
-      - 'README.md'
-      - 'CHANGELOG.md'
+      - '**.md'
+      - 'e2e/**'
       - 'LICENSE'
       - '.gitignore'
 
