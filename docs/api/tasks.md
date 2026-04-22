@@ -39,6 +39,7 @@
 - **URL**: `/tasks/:id`
 - **Method**: `PUT`
 - **Payload**: 与创建任务相同。
+- **业务逻辑**: 如果修改了 `share_url` 或 `extract_code`，系统会自动将任务的 `status` 重置为 `pending` 并清空 `message`，以此来自动解除因原链接失效导致的 `[Fatal]` 封锁。
 
 ---
 
@@ -69,6 +70,16 @@
   - 自动跳过状态为 `running` 的任务。
   - 自动跳过 message 中包含 `[Fatal]` 关键字的故障任务。
 - **Response**: `{"message": "批量执行已开启，共触发 X 个任务", "count": X}`
+
+---
+
+## 5.6 忽略/消除错误状态 (Dismiss)
+
+手动清除任务的错误消息及状态，使其恢复为待命中状态。常用于网盘容量不足清理后，或网络波动导致失败后的重试。
+
+- **URL**: `/tasks/:id/dismiss`
+- **Method**: `POST`
+- **Side Effect**: 将任务的 `status` 置为 `pending`，清空 `message` 和 `stage`。
 
 ---
 
@@ -169,4 +180,5 @@
 | `{TASKNAME}`| (内置变量) | 当前任务的显示名称 | - |
 
 ### 使用方法
+
 在“替换规则 (Replacement)”中直接引用即可。例如：`[{DATE}] {TASKNAME}.{EXT}`。

@@ -92,8 +92,9 @@
 | 字段 | 类型 | 说明 |
 | :--- | :--- | :--- |
 | `id` | string | 文件夹唯一标识 (FID) |
+| `name` | string | 文件夹原始名称 (与 `label` 相同，供兼容性使用) |
+| `label` | string | 文件夹显示名称 (供 UI 组件使用) |
 | `path` | string | 文件夹的绝对路径 |
-| `label` | string | 文件夹显示名称 |
 | `isLeaf` | bool | 是否为叶子节点（目前统一返回 false 以支持展开） |
 
 ---
@@ -107,7 +108,6 @@
 - **Payload**:
 | 字段 | 类型 | 必填 | 说明 |
 | :--- | :--- | :--- | :--- |
-| `parent_id` | string | 否 | 父目录 ID |
 | `parent_path`| string | 是 | 父目录绝对路径 |
 | `name` | string | 是 | 新文件夹名称 |
 

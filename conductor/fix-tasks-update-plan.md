@@ -4,12 +4,14 @@
 
 ---
 
-### Task 1: 优化后端任务创建与更新接口
+## Task 1: 优化后端任务创建与更新接口
 
 **Files:**
+
 - Modify: `internal/api/router.go`
 
 **Changes:**
+
 1. **`createTask` 函数**: 在 `db.DB.Create(&task)` 之后，增加 `db.DB.Preload("Account").First(&task, task.ID)`。
 2. **`updateTask` 函数**: 在 `db.DB.Model(&task).Updates(updateData)` 之后，增加 `db.DB.Preload("Account").First(&task, task.ID)`。
 
@@ -18,7 +20,7 @@
 
 ---
 
-### Task 2: 验证修复效果
+## Task 2: 验证修复效果
 
 - [ ] 创建一个新任务。
 - [ ] 确认任务创建成功后，列表中的账号昵称正常显示。
@@ -27,7 +29,7 @@
 
 ---
 
-### Task 3: 自动提交
+## Task 3: 自动提交
 
 - 提交代码更改。
 - 不自动推送。

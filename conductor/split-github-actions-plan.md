@@ -11,7 +11,7 @@
 
 - Delete: `.github/workflows/docker-publish.yml`
 
-### Task 2: 创建主分支发布流水线
+## Task 2: 创建主分支发布流水线
 
 **Files:**
 
@@ -24,7 +24,7 @@
   `CHANGELOG.md`, `LICENSE`, `.gitignore`。
 - 构建逻辑: 直接构建并推送 `latest` 标签。
 
-### Task 3: 创建 Tags 发布流水线
+## Task 3: 创建 Tags 发布流水线
 
 **Files:**
 
@@ -35,7 +35,7 @@
 - 触发条件: 仅 `push` 到匹配 `v*` 的 `tags`。
 - 构建逻辑: 提取标签名称（如 `v1.0.0`），构建并推送该版本的镜像。
 
-### Task 4: 提交与推送
+## Task 4: 提交与推送
 
 - [ ] 提交所有流水线修改。
 - [ ] 推送到远程仓库，以验证过滤功能生效。

@@ -79,7 +79,7 @@ checkbox (`- [ ]`) syntax for tracking.
   }
   ```
 
-### Task 2: 实现独立大屏目录选择弹窗
+## Task 2: 实现独立大屏目录选择弹窗
 
 **Files:**
 
@@ -178,7 +178,7 @@ checkbox (`- [ ]`) syntax for tracking.
   }
   ```
 
-### Task 3: 改造新建文件夹的交互逻辑
+## Task 3: 改造新建文件夹的交互逻辑
 
 **Files:**
 
@@ -265,7 +265,7 @@ checkbox (`- [ ]`) syntax for tracking.
   }
   ```
 
-### Task 4: 验证与清理
+## Task 4: 验证与清理
 
 **Files:**
 

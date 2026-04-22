@@ -31,7 +31,7 @@ checkbox (`- [ ]`) syntax for tracking.
   在 `internal/db/db.go` 中，找到 `Task` 结构体。在 `StartDate` 字段下方添加 `StartFileID string
 \`gorm:"size:255" json:"start_file_id"\``。
 
-### Task 2: 实现分享链接解析 API
+## Task 2: 实现分享链接解析 API
 
 **Files:**
 
@@ -48,7 +48,7 @@ checkbox (`- [ ]`) syntax for tracking.
   - 调用 `driver.ParseShare` 获取 `[]core.FileInfo`。
   - 直接返回 JSON 格式的文件列表。
 
-### Task 3: 改造 Worker 引擎过滤逻辑
+## Task 3: 改造 Worker 引擎过滤逻辑
 
 **Files:**
 
@@ -61,7 +61,7 @@ checkbox (`- [ ]`) syntax for tracking.
     task.StartFileID`，则跳出循环 (`break`)。
   - **注意**：由于获取到的文件列表默认是由新到旧排序的，当遇到 `StartFileID` 时，说明其后面的文件更老，应当停止处理并进行转存。
 
-### Task 4: 前端视图与交互重构
+## Task 4: 前端视图与交互重构
 
 **Files:**
 

@@ -30,7 +30,7 @@ Task 模型中增加 StartDate 字段，并新增三个 API（获取目录树、
   - 因为 `cmd/server/main.go` 中调用了 `db.DB.AutoMigrate`，只需重新编译运行服务，SQLite 数据库即可自动增加
     `start_date` 列。
 
-### Task 2: 实现后端目录树形选择 API
+## Task 2: 实现后端目录树形选择 API
 
 **Files:**
 
@@ -54,7 +54,7 @@ Task 模型中增加 StartDate 字段，并新增三个 API（获取目录树、
   - 调用驱动的类似 `CreateFolder(parent_id, name)` 方法。
   - 返回新建成功后的文件夹信息 `[{ id: "new_id", label: "新文件夹", isLeaf: false }]`。
 
-### Task 3: 实现后端全量重命名预览 API
+## Task 3: 实现后端全量重命名预览 API
 
 **Files:**
 
@@ -76,7 +76,7 @@ Task 模型中增加 StartDate 字段，并新增三个 API（获取目录树、
     - 对剩余的文件，调用现有的 `renamer` 引擎，使用 `pattern` 和 `replacement` 生成新文件名。
   - 将每个文件的原始名称、新名称和匹配状态打包成切片，通过 JSON 响应给前端。
 
-### Task 4: 升级底层转存引擎 (Worker)
+## Task 4: 升级底层转存引擎 (Worker)
 
 **Files:**
 
@@ -91,7 +91,7 @@ Task 模型中增加 StartDate 字段，并新增三个 API（获取目录树、
   - 在正式发起文件的转存/保存请求前，检查 `task.SavePath`。
   - 调用云盘驱动的接口校验该路径是否存在。如果不存在，则调用创建文件夹接口自动创建它。
 
-### Task 5: 前端 UI 重构与组件升级
+## Task 5: 前端 UI 重构与组件升级
 
 **Files:**
 

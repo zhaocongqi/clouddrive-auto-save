@@ -4,17 +4,19 @@
 
 ---
 
-### Task 1: 修正后端目录接口返回结构
+## Task 1: 修正后端目录接口返回结构
 
 **Files:**
+
 - Modify: `internal/api/folder.go`
 
 **Changes:**
+
 1. 修改 `getAccountFolders` 函数中的结果组装逻辑。
 2. 将返回的对象从 `core.FileInfo` 转换为包含 `label` 和 `isLeaf` 字段的 Map 结构。
 3. 确保 `label` 字段被赋予文件夹的名称，`isLeaf` 统一设为 `false`（支持继续展开）。
 
-### Task 2: 验证修复效果
+## Task 2: 验证修复效果
 
 - [ ] 打开任务编辑对话框。
 - [ ] 点击“选择目录”。

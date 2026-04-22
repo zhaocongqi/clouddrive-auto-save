@@ -18,7 +18,7 @@
 2. 将该参数通过 `-ldflags="-X main.version=${VERSION}"` 注入编译步骤，确保 Docker
    容器内运行的程序也能打印正确的版本号。
 
-### Task 2: 改造主分支流水线 (Main Branch)
+## Task 2: 改造主分支流水线 (Main Branch)
 
 **Files:**
 
@@ -33,7 +33,7 @@
    - 传递 `build-args: VERSION=latest`
    - 自动执行推送。
 
-### Task 3: 改造标签发布流水线 (Tags)
+## Task 3: 改造标签发布流水线 (Tags)
 
 **Files:**
 
@@ -47,7 +47,7 @@
 4. **双标签推送**：打 tag 发布时，不仅推送 `${TAG_NAME}` 标签（如 `v1.0.0`），还会同步更新 `latest`
    标签，这是开源项目的最佳实践。
 
-### Task 4: 提交与推送
+## Task 4: 提交与推送
 
 - [ ] 提交修改到主分支。
 - [ ] 自动执行推送以验证新流水线能否正确编译并上传异构镜像。

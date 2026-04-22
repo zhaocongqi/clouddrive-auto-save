@@ -15,7 +15,7 @@
 
 - 在项目根目录创建 `VERSION` 文件，初始内容为 `1.0.0`。
 
-### Task 2: 简化 Makefile 版本获取逻辑
+## Task 2: 简化 Makefile 版本获取逻辑
 
 **Files:**
 
@@ -27,7 +27,7 @@
   "v1.0.0")` 替换为读取 `VERSION` 文件的逻辑：
   `VERSION ?= $(shell cat VERSION 2>/dev/null || echo "1.0.0")`。
 
-### Task 3: 验证
+## Task 3: 验证
 
 - [ ] **Step 1: 运行 `make build-server`** 确认编译输出的版本号为干净的 `1.0.0`。
 - [ ] **Step 2: 运行 `make docker-build`** 确认镜像标签为

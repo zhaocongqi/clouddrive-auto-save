@@ -25,7 +25,7 @@
 5. **执行发布**: 使用官方 `goreleaser/goreleaser-action@v5` 运行 `release --clean` 命令，自动读取
    `.goreleaser.yaml` 配置，完成交叉编译与 GitHub Releases 发布。
 
-### Task 2: 提交与推送
+## Task 2: 提交与推送
 
 - [ ] 提交新增的工作流文件。
 - [ ] 推送至远程仓库。

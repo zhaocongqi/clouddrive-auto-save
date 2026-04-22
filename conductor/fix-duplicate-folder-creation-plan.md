@@ -60,7 +60,7 @@ tracking.
 >>>>
 ```
 
-### Task 2: 验证与提交
+## Task 2: 验证与提交
 
 - [ ] **Step 1: 编译测试**
   在 `web/` 目录下运行 `npm run build` 确保无语法错误。

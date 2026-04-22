@@ -34,7 +34,7 @@ checkbox (`- [ ]`) syntax for tracking.
   - 添加显示文字：例如 `已用 10GB / 总共 100GB (剩 90GB)`。
   - 为 `el-progress` 添加特定的 class（如 `.gradient-progress`），稍后在 CSS 中实现渐变效果。
 
-### Task 2: 实现进度条渐变及全局样式美化
+## Task 2: 实现进度条渐变及全局样式美化
 
 **Files:**
 
@@ -49,7 +49,7 @@ checkbox (`- [ ]`) syntax for tracking.
   - 调整 `.table-card` 的阴影和圆角，使其更加现代化。
   - 为不同列的数据（如时间、状态）增加合适的颜色。
 
-### Task 3: 优化编辑/添加弹窗的表单布局
+## Task 3: 优化编辑/添加弹窗的表单布局
 
 **Files:**
 
@@ -62,7 +62,7 @@ checkbox (`- [ ]`) syntax for tracking.
 - [ ] **Step 2: 确保逻辑一致性**
   - 检查弹窗关闭和保存的交互，确保 loading 状态正确显示。
 
-### Task 4: 测试与验证
+## Task 4: 测试与验证
 
 - [ ] **Step 1: 验证表格展示**
   启动前端环境，观察账号列表：

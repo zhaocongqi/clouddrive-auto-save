@@ -20,7 +20,7 @@
 2. 引入 Element Plus 的 `<el-empty>` 组件，增加友好的引导语（“您还没有绑定任何云盘账号”），并使用插槽 `#default`
    提供一个主按钮（“立即绑定账号”），点击后触发 `openAddDialog`。
 
-### Task 2: 优化 Tasks.vue 的空状态展示
+## Task 2: 优化 Tasks.vue 的空状态展示
 
 **Files:**
 
@@ -32,7 +32,7 @@
 2. 引入 `<el-empty>` 组件，增加引导语（“当前没有任何转存任务”），并使用插槽 `#default`
    提供一个主按钮（“创建新任务”），点击后触发 `openAddDialog`。
 
-### Task 3: 修复后端启动时的 Record Not Found 错误
+## Task 3: 修复后端启动时的 Record Not Found 错误
 
 **Files:**
 

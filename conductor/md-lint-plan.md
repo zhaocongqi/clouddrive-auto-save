@@ -17,7 +17,7 @@
    `node_modules` 和 `web/node_modules`。
 2. 将 `lint-md` 加入到现有的 `check` 完整验证流程中（例如：`check: lint lint-md vet test`）。
 
-### Task 2: 强化 CI 流水线 (ci.yml)
+## Task 2: 强化 CI 流水线 (ci.yml)
 
 **Files:**
 
@@ -29,7 +29,7 @@
 2. **环境依赖**: 在 `Run checks` 步骤前，增加 `actions/setup-node@v4`，以提供执行 `npx` 命令所需的
    Node.js 环境。
 
-### Task 3: 自动提交与推送
+## Task 3: 自动提交与推送
 
 - 提交代码更改。
 - 不推送到远程。

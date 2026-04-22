@@ -21,6 +21,6 @@ check`，从而避免在仅修改文档或前端代码时浪费 CI 资源。
    - `Makefile` (构建脚本)
    - `.github/workflows/ci.yml` (流水线配置本身)
 
-### Task 2: 自动提交
+## Task 2: 自动提交
 
 - [ ] 本地提交修改，不自动推送。
