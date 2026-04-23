@@ -44,7 +44,9 @@ jobs:
         with:
           node-version: '24'
           cache: 'npm'
-          cache-dependency-path: web/package-lock.json
+          cache-dependency-path: |
+            web/package-lock.json
+            e2e/package-lock.json
 
       - name: Install Node modules (E2E)
         run: cd e2e && npm install
