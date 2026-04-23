@@ -22,6 +22,9 @@ on:
       - 'e2e/**'
       - '.github/workflows/e2e.yml'
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   e2e-test:
     name: Run Playwright E2E Tests
@@ -39,7 +42,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
           cache-dependency-path: web/package-lock.json
 
