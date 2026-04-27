@@ -1,47 +1,119 @@
-# E2E 账号真实交互测试优化计划 (E2E Account Real Interaction Plan)
+# Quark E2E Extended Coverage Implementation Plan
 
-**Goal:** 摒弃在后端 `main.go` 中直接通过 SQL 插入测试账号的做法，改为由 Playwright 通过前端 UI 真实模拟用户的“添加账号”操作，从而实现对前后端表单校验、接口调用及 HTTP Mock 链路的 100% 真实覆盖。
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Expand the E2E test coverage for Quark accounts to include various member types (Normal, Over-capacity) by making the HTTP mock dynamic based on cookie parameters.
+
+**Architecture:** 
+1. Parameterize `addQuarkAccount` in `account.fixture.ts` to accept a custom cookie string and username prefix.
+2. Modify `mock_http.go` to parse the incoming Cookie header (or `kps` for the app route) to return dynamic member and capacity JSON payloads.
+3. Add new test cases to `quark.spec.ts` for Normal users and Over-capacity users, asserting the correct display names and sizes.
+
+**Tech Stack:** Go (HTTP Mock), TypeScript / Playwright (E2E Tests)
 
 ---
 
-### 问题分析 (Context)
-
-当前的 `make e2e-test` 在启动后端服务时，会在 `main.go` 中通过 GORM 直接向数据库插入两个测试账号。
-虽然这样能快速准备前置数据，但这破坏了 E2E 测试的完整性，导致前端的“添加账号弹窗”、“表单提交逻辑”、“后端的 `createAccount` 接口”未能被自动化测试覆盖。由于我们的 HTTP Mock 层已经能够完美模拟网盘接口的响应，让测试脚本通过 UI 创建账号是更符合 E2E 理念的最佳实践。
-
-### Task 1: 移除后端的硬编码注入
+### Task 1: Refactor Quark E2E Fixture
 
 **Files:**
-- Modify: `cmd/server/main.go`
+- Modify: `e2e/fixtures/account.fixture.ts`
 
-**Changes:**
-1. 在 `isE2E` 的判断分支中，保留 `core.SetupE2EHTTPMock()` 开启 Mock 拦截器。
-2. 删除 `db.DB.Create(&db.Account{...})` 注入测试账号的代码块。让 E2E 环境以一个干净的数据库启动。
+- [ ] **Step 1: Write the minimal implementation**
 
-### Task 2: 改造 E2E 测试脚本
+```typescript
+// Replace addQuarkAccount in e2e/fixtures/account.fixture.ts
+export async function addQuarkAccount(page: Page, cookieStr: string = '__uid=mock; mock_cookie', username: string = 'E2E夸克用户') {
+  await page.goto('/accounts');
+  if (await page.getByText(username).isVisible()) return;
+
+  await page.getByRole('button', { name: /立即绑定账号|添加账号/ }).first().click();
+  await page.getByText('夸克网盘', { exact: true }).click();
+  await page.getByLabel('Cookie 全量字符串').fill(cookieStr);
+  await page.getByRole('button', { name: '确认添加' }).click();
+  await expect(page.getByText(username)).toBeVisible({ timeout: 10000 });
+}
+```
+
+### Task 2: Implement Dynamic HTTP Mocks for Quark
 
 **Files:**
-- Modify: `e2e/tests/core.spec.ts`
+- Modify: `internal/core/mock_http.go`
 
-**Changes:**
-1. **重写“账号管理”测试用例**:
-   - 验证初始的无账号状态（例如：验证页面中存在“立即绑定账号”按钮）。
-   - **交互：添加 139 账号**:
-     - 点击“立即绑定账号”或右上角的添加按钮。
-     - 在平台选项中选择“移动云盘”。
-     - 在 `Authorization` 文本框中输入 mock 数据 `mock_auth`。
-     - 点击“确认添加”。
-     - 断言成功提示（如“E2E测试账号(移动云盘)”出现）。
-   - **交互：添加 Quark 账号**:
-     - 再次打开添加账号弹窗。
-     - 切换平台至“夸克网盘”。
-     - 在 `Cookie 全量字符串` 文本框中输入 `mock_cookie`。
-     - 点击“确认添加”。
-     - 断言成功提示。
-   - **保留原有的容量断言**: 
-     - 在通过真实的 UI 添加后，依然断言界面上渲染出了 HTTP Mock 给出的 `512 GB / 1 TB` 等容量信息。
+- [ ] **Step 1: Write the minimal implementation**
 
-### Task 3: 运行验证与提交
+```go
+// Replace the quark info/member sections in internal/core/mock_http.go
+	// 1. 模拟夸克相关接口
+	if strings.Contains(url, "drive-pc.quark.cn/1/clouddrive/share/sharepage/save") {
+		respBody = `{"code": 0, "message": "ok", "data": {"task_id": "mock_task_123"}}`
+	} else if strings.Contains(url, "drive-pc.quark.cn/1/clouddrive/task") {
+		// 模拟任务成功
+		respBody = `{"code": 0, "message": "ok", "data": {"status": 2, "message": "success"}}`
+	} else if strings.Contains(url, "drive-pc.quark.cn/1/clouddrive/file/rename") {
+		respBody = `{"code": 0, "message": "ok"}`
+	} else if strings.Contains(url, "pan.quark.cn/account/info") {
+		nickname := "E2E夸克用户"
+		if strings.Contains(req.Header.Get("Cookie"), "mock_normal") {
+			nickname = "E2E普通用户"
+		} else if strings.Contains(req.Header.Get("Cookie"), "mock_overcap") {
+			nickname = "E2E超容用户"
+		}
+		respBody = `{"code": 0, "data": {"nickname": "` + nickname + `"}}`
+	} else if strings.Contains(url, "pan.quark.cn/1/clouddrive/member") || strings.Contains(url, "drive-pc.quark.cn/1/clouddrive/capacity") {
+		// 根据 Cookie 动态返回会员与容量
+		memberType := "SUPER_VIP"
+		totalCap := "1099511627776" // 1TB
+		usedCap := "549755813888"   // 512GB
 
-- 执行 `pkill -9 ucas || true && make e2e-test` 观察 Playwright 能否顺利完成真实的表单提交流程。
-- 提交代码。
+		if strings.Contains(req.Header.Get("Cookie"), "mock_normal") {
+			memberType = "NORMAL"
+			totalCap = "10737418240" // 10GB
+			usedCap = "1073741824"   // 1GB
+		} else if strings.Contains(req.Header.Get("Cookie"), "mock_overcap") {
+			memberType = "SUPER_VIP"
+			totalCap = "1099511627776" // 1TB
+			usedCap = "2199023255552"  // 2TB (Over-capacity)
+		}
+
+		respBody = `{"code": 0, "member_type": "` + memberType + `", "data": {"total_capacity": ` + totalCap + `, "used_capacity": ` + usedCap + `, "use_capacity": ` + usedCap + `, "member_type": "` + memberType + `"}}`
+	} else if strings.Contains(url, "drive-pc.quark.cn/1/clouddrive/share/sharepage/detail") {
+```
+
+### Task 3: Add Extended E2E Test Cases for Quark
+
+**Files:**
+- Modify: `e2e/tests/accounts/quark.spec.ts`
+
+- [ ] **Step 1: Write the failing test / implementation**
+
+```typescript
+// Replace e2e/tests/accounts/quark.spec.ts content
+import { test, expect } from '@playwright/test';
+import { addQuarkAccount } from '../../fixtures/account.fixture';
+
+test.describe('夸克网盘账号管理', () => {
+  test('成功绑定并展示夸克SVIP账号', async ({ page }) => {
+    await addQuarkAccount(page);
+    await expect(page.getByText('512').last()).toBeVisible();
+    await expect(page.getByText('SVIP').last()).toBeVisible();
+  });
+
+  test('成功绑定并展示夸克普通用户小容量账号', async ({ page }) => {
+    await addQuarkAccount(page, '__uid=mock; mock_normal', 'E2E普通用户');
+    await expect(page.getByText('E2E普通用户')).toBeVisible();
+    await expect(page.getByText('普通用户').last()).toBeVisible();
+    await expect(page.getByText('10').last()).toBeVisible(); // 10GB
+  });
+
+  test('成功绑定并展示夸克超容状态账号', async ({ page }) => {
+    await addQuarkAccount(page, '__uid=mock; mock_overcap', 'E2E超容用户');
+    await expect(page.getByText('E2E超容用户')).toBeVisible();
+    await expect(page.getByText('2048').last()).toBeVisible(); // 2TB used
+  });
+});
+```
+
+- [ ] **Step 2: Run test to verify it passes**
+
+Run: `cd e2e && npx playwright test tests/accounts/quark.spec.ts`
+Expected: PASS
