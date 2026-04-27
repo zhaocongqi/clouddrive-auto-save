@@ -19,7 +19,7 @@ test.describe('夸克网盘账号管理', () => {
     await addQuarkAccount(page, '__uid=mock; mock_overcap', 'E2E超容用户');
     await expect(page.getByText('E2E超容用户')).toBeVisible();
     await expect(page.getByText('2 TB').last()).toBeVisible(); // 2TB used
-    await expect(page.getByText('已超额 1 TB')).toBeVisible();
+    await expect(page.getByText('已超额 1 TB').last()).toBeVisible();
   });
 
   test('成功绑定并展示夸克SVIP+账号', async ({ page }) => {
