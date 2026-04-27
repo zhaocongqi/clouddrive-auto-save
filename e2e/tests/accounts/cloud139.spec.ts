@@ -23,4 +23,10 @@ test.describe('139 移动云盘账号管理', () => {
     await expect(page.getByText('2 TB').last()).toBeVisible(); // 2TB used
     await expect(page.getByText('已超额 1 TB').last()).toBeVisible();
   });
+
+  test('成功绑定并展示 139 白银会员账号', async ({ page }) => {
+    await add139Account(page, 'mock_silver', 'E2E139白银会员');
+    await expect(page.getByText('E2E139白银会员')).toBeVisible();
+    await expect(page.getByText('白银会员').last()).toBeVisible();
+  });
 });
