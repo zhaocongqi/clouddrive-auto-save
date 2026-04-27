@@ -81,7 +81,7 @@ func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		respBody = `{"code": "0000", "success": true, "data": {"auditNickName": "` + nickname + `", "userName": "` + nickname + `", "userDomainId": "mock_domain", "loginName": "13800000000"}}`
 	} else if strings.Contains(url, "user-njs.yun.139.com/user/disk/getPersonalDiskInfo") || strings.Contains(url, "user-njs.yun.139.com/user/disk/getFamilyDiskInfo") {
 		// 返回 MB 单位
-		diskSize := "1048576"   // 1TB (1024 * 1024 MB)
+		diskSize := "1048576"    // 1TB (1024 * 1024 MB)
 		freeDiskSize := "524288" // 512GB (512 * 1024 MB)
 
 		if strings.Contains(req.Header.Get("Authorization"), "mock_normal") {
