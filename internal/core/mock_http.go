@@ -77,6 +77,8 @@ func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 			nickname = "E2E139普通用户"
 		} else if strings.Contains(req.Header.Get("Authorization"), "mock_overcap") {
 			nickname = "E2E139超容用户"
+		} else if strings.Contains(req.Header.Get("Authorization"), "mock_silver") {
+			nickname = "E2E139白银会员"
 		}
 		respBody = `{"code": "0000", "success": true, "data": {"auditNickName": "` + nickname + `", "userName": "` + nickname + `", "userDomainId": "mock_domain", "loginName": "13800000000"}}`
 	} else if strings.Contains(url, "user-njs.yun.139.com/user/disk/getPersonalDiskInfo") || strings.Contains(url, "user-njs.yun.139.com/user/disk/getFamilyDiskInfo") {
@@ -103,6 +105,8 @@ func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 			vipName = "普通用户"
 		} else if strings.Contains(req.Header.Get("Authorization"), "mock_overcap") {
 			vipName = "钻石会员"
+		} else if strings.Contains(req.Header.Get("Authorization"), "mock_silver") {
+			vipName = "白银会员"
 		}
 		respBody = `{"code": "0", "success": true, "data": {"userSubMemberList": [{"memberLvName": "` + vipName + `"}]}}`
 	} else if strings.Contains(url, "share-kd-njs.yun.139.com/yun-share/richlifeApp/devapp/IOutLink/getOutLinkInfoV6") {
