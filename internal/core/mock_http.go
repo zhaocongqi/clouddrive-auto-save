@@ -72,11 +72,39 @@ func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	// 2. 模拟 139 相关接口
 	if strings.Contains(url, "user-njs.yun.139.com/user/getUser") {
-		respBody = `{"code": "0000", "success": true, "data": {"auditNickName": "E2E移动云盘用户", "userName": "E2E移动云盘用户", "userDomainId": "mock_domain", "loginName": "13800000000"}}`
+		nickname := "E2E移动云盘用户"
+		if strings.Contains(req.Header.Get("Authorization"), "mock_normal") {
+			nickname = "E2E139普通用户"
+		} else if strings.Contains(req.Header.Get("Authorization"), "mock_overcap") {
+			nickname = "E2E139超容用户"
+		}
+		respBody = `{"code": "0000", "success": true, "data": {"auditNickName": "` + nickname + `", "userName": "` + nickname + `", "userDomainId": "mock_domain", "loginName": "13800000000"}}`
 	} else if strings.Contains(url, "user-njs.yun.139.com/user/disk/getPersonalDiskInfo") || strings.Contains(url, "user-njs.yun.139.com/user/disk/getFamilyDiskInfo") {
-		respBody = `{"code": "0", "success": true, "data": {"diskSize": "1048576", "freeDiskSize": "524288"}}`
+		// 返回 MB 单位
+		diskSize := "1048576"   // 1TB (1024 * 1024 MB)
+		freeDiskSize := "524288" // 512GB (512 * 1024 MB)
+
+		if strings.Contains(req.Header.Get("Authorization"), "mock_normal") {
+			diskSize = "20480"     // 20GB
+			freeDiskSize = "10240" // 10GB
+		} else if strings.Contains(req.Header.Get("Authorization"), "mock_overcap") {
+			if strings.Contains(url, "getFamilyDiskInfo") {
+				diskSize = "0"
+				freeDiskSize = "0"
+			} else {
+				diskSize = "1048576"      // 1TB
+				freeDiskSize = "-1048576" // -1TB -> Used = 2TB. Excess = 1TB.
+			}
+		}
+		respBody = `{"code": "0", "success": true, "data": {"diskSize": "` + diskSize + `", "freeDiskSize": "` + freeDiskSize + `"}}`
 	} else if strings.Contains(url, "yun.139.com/orchestration/group-rebuild/member/v1.0/queryUserBenefits") {
-		respBody = `{"code": "0", "success": true, "data": {"userSubMemberList": [{"memberLvName": "黄金会员"}]}}`
+		vipName := "黄金会员"
+		if strings.Contains(req.Header.Get("Authorization"), "mock_normal") {
+			vipName = "普通用户"
+		} else if strings.Contains(req.Header.Get("Authorization"), "mock_overcap") {
+			vipName = "钻石会员"
+		}
+		respBody = `{"code": "0", "success": true, "data": {"userSubMemberList": [{"memberLvName": "` + vipName + `"}]}}`
 	} else if strings.Contains(url, "share-kd-njs.yun.139.com/yun-share/richlifeApp/devapp/IOutLink/getOutLinkInfoV6") {
 		respBody = `{"code": "0", "data": {"coLst": [{"coID": "f1", "coName": "[2024.04.20] E2E测试电影.mp4", "size": 1024, "udTime": "20240420120000"}, {"coID": "f2", "coName": "readme.txt", "size": 100, "udTime": "20240420120100"}], "caLst": []}}`
 	} else if strings.Contains(url, "share-kd-njs.yun.139.com/yun-share/richlifeApp/devapp/IBatchOprTask/createOuterLinkBatchOprTask") {
