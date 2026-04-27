@@ -173,8 +173,8 @@ func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		if strings.Contains(bodyStr, "mock_invalid") {
 			respBody = `{"code": "200000727", "message": "分享链接不存在或已被取消。"}`
 		} else {
-			// 提供完整的 parentCatalogID 和 contentID 以支持 SaveLink 中的路径计算
-			respBody = `{"code": "0", "data": {"coLst": [{"coID": "f1", "contentID": "f1", "parentCatalogID": "root", "coName": "[2024.04.20] E2E测试电影.mp4", "size": 1024, "udTime": "20240420120000"}, {"coID": "f2", "contentID": "f2", "parentCatalogID": "root", "coName": "readme.txt", "size": 100, "udTime": "20240420120100"}], "caLst": []}}`
+			// 提供完整的 path 以确保 ParseShare 和 SaveLink 标识符一致
+			respBody = `{"code": "0", "data": {"coLst": [{"coID": "f1", "contentID": "f1", "parentCatalogID": "root", "path": "root/f1", "coName": "[2024.04.20] E2E测试电影.mp4", "size": 1024, "udTime": "20240420120000"}, {"coID": "f2", "contentID": "f2", "parentCatalogID": "root", "path": "root/f2", "coName": "readme.txt", "size": 100, "udTime": "20240420120100"}], "caLst": []}}`
 		}
 	} else if strings.Contains(url, "share-kd-njs.yun.139.com/yun-share/richlifeApp/devapp/IBatchOprTask/createOuterLinkBatchOprTask") {
 		savedFilesMu.Lock()
