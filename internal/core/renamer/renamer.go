@@ -40,8 +40,9 @@ func (p *Processor) Process(opts RenameOptions) (string, error) {
 
 	result := opts.Replacement
 
-	// 1. 替换基础变量 {TASKNAME}
+	// 1. 替换基础变量 {TASKNAME} 和 {OLDNAME}
 	result = strings.ReplaceAll(result, "{TASKNAME}", opts.TaskName)
+	result = strings.ReplaceAll(result, "{OLDNAME}", opts.FileName)
 
 	// 2. 尝试从原文件名中通过正则提取魔法变量的值并替换到 result 中
 	for varName, regPattern := range MagicVariables {
