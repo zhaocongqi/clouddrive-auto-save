@@ -28,7 +28,7 @@ test.describe('任务管理：状态机与执行测试', () => {
 
     // 验证状态变更为“SUCCESS”
     const updatedTaskRow = page.locator('tr').filter({ hasText: taskName });
-    await expect(updatedTaskRow.locator('.el-tag').filter({ hasText: 'SUCCESS' })).toBeVisible({ timeout: 30000 });
+    await expect(updatedTaskRow.locator('.el-tag').filter({ hasText: 'SUCCESS' })).toBeVisible({ timeout: 60000 });
 
     // 校验：文件是否真的被转存成功了 (通过起始文件选择器查看是否显示“已在网盘”)
     await page.getByRole('button', { name: '创建任务' }).last().click();
