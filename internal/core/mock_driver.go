@@ -45,6 +45,8 @@ func (m *MockDriver) DeleteFile(ctx context.Context, fileID string) error {
 }
 
 func (m *MockDriver) ParseShare(ctx context.Context, shareURL, extractCode string) ([]FileInfo, error) {
+	// 模拟网络延迟
+	time.Sleep(200 * time.Millisecond)
 	if len(m.ShareFiles) > 0 {
 		return m.ShareFiles, nil
 	}
@@ -56,6 +58,8 @@ func (m *MockDriver) ParseShare(ctx context.Context, shareURL, extractCode strin
 }
 
 func (m *MockDriver) SaveLink(ctx context.Context, shareURL, extractCode, targetPath string, fileIDs []string) error {
+	// 模拟网络延迟
+	time.Sleep(200 * time.Millisecond)
 	m.SaveLinkCalls++
 	m.SavedFileIDs = append(m.SavedFileIDs, fileIDs...)
 	m.TargetPaths = append(m.TargetPaths, targetPath)
