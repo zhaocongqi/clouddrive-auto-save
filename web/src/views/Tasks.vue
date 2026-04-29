@@ -21,57 +21,6 @@
       </div>
     </div>
 
-    <!-- 全局调度控制 -->
-    <el-card class="global-settings-card" style="margin-bottom: 24px;">
-      <div class="global-settings-content">
-        <div class="setting-info">
-          <el-icon class="setting-icon"><Clock /></el-icon>
-          <div class="setting-text">
-            <span class="setting-title">全局自动调度模式</span>
-            <span class="setting-desc">开启后，所有状态为“跟随全局”的任务将按照右侧规则统一执行。</span>
-          </div>
-        </div>
-        <div class="setting-actions">
-          <div class="action-item">
-            <span class="action-label">全局开关:</span>
-            <el-switch 
-              v-model="globalSchedule.enabled" 
-              active-text="已开启" 
-              inactive-text="已关闭"
-              @change="saveGlobalSettings"
-            />
-          </div>
-          <el-divider direction="vertical" style="height: 32px; margin: 0 20px;" />
-          <div class="action-item">
-            <span class="action-label">调度频率:</span>
-            <el-input 
-              v-model="globalSchedule.cron" 
-              placeholder="秒 分 时 日 月 周" 
-              style="width: 220px"
-              @blur="saveGlobalSettings"
-              @keyup.enter="saveGlobalSettings"
-            >
-              <template #suffix>
-                <el-tooltip placement="top">
-                  <template #content>
-                    标准 6 位表达式：<br/>
-                    1. 秒 (0-59)<br/>
-                    2. 分 (0-59)<br/>
-                    3. 时 (0-23)<br/>
-                    4. 日 (1-31)<br/>
-                    5. 月 (1-12)<br/>
-                    6. 周 (0-6)<br/>
-                    例如: 0 0 2 * * * (每天凌晨2点)
-                  </template>
-                  <el-icon style="cursor: help"><Info /></el-icon>
-                </el-tooltip>
-              </template>
-            </el-input>
-          </div>
-        </div>
-      </div>
-    </el-card>
-
     <el-card class="table-card">
       <el-table v-if="taskList.length > 0 || loading" :data="taskList" v-loading="loading" style="width: 100%">
         <el-table-column label="任务名称" min-width="180">
@@ -474,7 +423,7 @@
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { Plus, Play, Edit, Trash2, RefreshCw, Folder, File, Info, Cloud, ExternalLink, AlertTriangle, Clock } from 'lucide-vue-next'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getTasks, createTask, updateTask, deleteTask, runTask, runAllTasks, previewTask, parseShareLink, getScheduleSettings, updateScheduleSettings } from '../api/task'
+import { getTasks, createTask, updateTask, deleteTask, runTask, runAllTasks, previewTask, parseShareLink, getScheduleSettings } from '../api/task'
 import { getAccounts, getFolders, createFolder } from '../api/account'
 
 const taskList = ref([])

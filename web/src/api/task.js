@@ -81,3 +81,25 @@ export function updateScheduleSettings(data) {
     data
   })
 }
+
+export function getGlobalSettings() {
+  return request({
+    url: '/settings/global',
+    method: 'get'
+  })
+}
+
+export function updateGlobalSettings(data) {
+  return request({
+    url: '/settings/global',
+    method: 'post',
+    data
+  })
+}
+
+export function testBark() {
+  return request({
+    url: '/settings/test_bark',
+    method: 'post'
+  })
+}
