@@ -182,6 +182,13 @@ func createAccount(c *gin.Context) {
 		c.PureJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
+	// 清理凭据中的空白字符和所有换行符（防止 HTTP Header 报错）
+	account.Cookie = strings.ReplaceAll(strings.ReplaceAll(account.Cookie, "\n", ""), "\r", "")
+	account.Cookie = strings.TrimSpace(account.Cookie)
+	account.AuthToken = strings.ReplaceAll(strings.ReplaceAll(account.AuthToken, "\n", ""), "\r", "")
+	account.AuthToken = strings.TrimSpace(account.AuthToken)
+
 	slog.Info("添加账号", "name", account.AccountName, "platform", account.Platform)
 	if err := db.DB.Create(&account).Error; err != nil {
 		c.PureJSON(http.StatusInternalServerError, gin.H{"error": "failed to create account"})
@@ -207,6 +214,13 @@ func updateAccount(c *gin.Context) {
 		c.PureJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
+	// 清理凭据中的空白字符和所有换行符（防止 HTTP Header 报错）
+	account.Cookie = strings.ReplaceAll(strings.ReplaceAll(account.Cookie, "\n", ""), "\r", "")
+	account.Cookie = strings.TrimSpace(account.Cookie)
+	account.AuthToken = strings.ReplaceAll(strings.ReplaceAll(account.AuthToken, "\n", ""), "\r", "")
+	account.AuthToken = strings.TrimSpace(account.AuthToken)
+
 	slog.Info("更新账号", "name", account.AccountName)
 	if err := db.DB.Save(&account).Error; err != nil {
 		c.PureJSON(http.StatusInternalServerError, gin.H{"error": "failed to update account"})
