@@ -201,7 +201,7 @@
                 :icon="ExternalLink" 
                 title="在新标签页中打开链接"
                 :disabled="!form.share_url"
-                @click="openExternalLink(form.share_url)"
+                @click="openExternalLink(form.share_url, form.extract_code)"
               />
             </template>
           </el-input>
@@ -613,9 +613,29 @@ const handleUrlChange = () => {
   selectedStartFileName.value = ''
 }
 
-const openExternalLink = (url) => {
+const openExternalLink = async (url, extractCode) => {
   if (url) {
-    window.open(url, '_blank')
+    let finalUrl = url
+    if (extractCode) {
+      try {
+        const urlObj = new URL(url)
+        urlObj.searchParams.set('pwd', extractCode)
+        finalUrl = urlObj.toString()
+      } catch (e) {
+        // 针对非标准 URL 的 Fallback 处理
+        finalUrl = url.includes('?') 
+          ? `${url}&pwd=${extractCode}` 
+          : `${url}?pwd=${extractCode}`
+      }
+      
+      try {
+        await navigator.clipboard.writeText(extractCode)
+        ElMessage.success(`提取码 ${extractCode} 已复制，请在新页面粘贴`)
+      } catch (err) {
+        console.warn('复制提取码失败:', err)
+      }
+    }
+    window.open(finalUrl, '_blank')
   }
 }
 
