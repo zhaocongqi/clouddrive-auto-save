@@ -1,9 +1,11 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -52,5 +54,81 @@ func TestListAccounts(t *testing.T) {
 	}
 	if accounts[0].Nickname != "User1" {
 		t.Errorf("expected nickname User1, got %s", accounts[0].Nickname)
+	}
+}
+
+func TestCreateAccountWithWhitespace(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r, testDB := setupTestRouter(t)
+
+	// 构造带有内部换行符、首尾换行符和空格的请求数据
+	accountData := map[string]interface{}{
+		"platform":     "139",
+		"account_name": "TestUser",
+		"cookie":       "  my-\nsecret\r-cookie\n\n ",
+		"auth_token":   "\nBearer\n secret-token  ",
+	}
+	body, _ := json.Marshal(accountData)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("POST", "/api/accounts", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status 200, got %d", w.Code)
+	}
+
+	// 从数据库验证数据是否已被清理
+	var savedAccount db.Account
+	testDB.First(&savedAccount, "account_name = ?", "TestUser")
+
+	if savedAccount.Cookie != "my-secret-cookie" {
+		t.Errorf("expected trimmed and cleaned cookie 'my-secret-cookie', got '%s'", savedAccount.Cookie)
+	}
+	if savedAccount.AuthToken != "Bearer secret-token" {
+		t.Errorf("expected trimmed and cleaned auth_token 'Bearer secret-token', got '%s'", savedAccount.AuthToken)
+	}
+}
+
+func TestUpdateAccountWithWhitespace(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r, testDB := setupTestRouter(t)
+
+	// 先创建一个正常账号
+	account := db.Account{
+		Platform:    "quark",
+		AccountName: "UpdateUser",
+		Cookie:      "old-cookie",
+	}
+	testDB.Create(&account)
+
+	// 构造更新数据，带有多余空白
+	updateData := map[string]interface{}{
+		"platform":     "quark",
+		"account_name": "UpdateUser",
+		"cookie":       "  new-cookie\n ",
+		"auth_token":   "  new-token  ",
+	}
+	body, _ := json.Marshal(updateData)
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("PUT", "/api/accounts/"+strconv.Itoa(int(account.ID)), bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status 200, got %d", w.Code)
+	}
+
+	// 验证数据库
+	var updatedAccount db.Account
+	testDB.First(&updatedAccount, account.ID)
+
+	if updatedAccount.Cookie != "new-cookie" {
+		t.Errorf("expected trimmed cookie 'new-cookie', got '%s'", updatedAccount.Cookie)
+	}
+	if updatedAccount.AuthToken != "new-token" {
+		t.Errorf("expected trimmed auth_token 'new-token', got '%s'", updatedAccount.AuthToken)
 	}
 }
