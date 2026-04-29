@@ -137,4 +137,76 @@ test.describe('任务管理：状态机与执行测试', () => {
     await errorTag.hover();
     await expect(page.getByText('该分享文件涉及违规内容，已被官方屏蔽。')).toBeVisible();
   });
+
+  test('139 移动云盘：验证提取码错误或未提供场景', async ({ page }) => {
+    const taskName = `139_提取码错_${Date.now()}`;
+    await page.goto('/tasks');
+    await page.getByRole('button', { name: '创建任务' }).last().click();
+    await page.locator('.el-select').first().click();
+    await page.getByRole('option', { name: 'E2E移动云盘用户' }).first().click();
+    await page.getByLabel('任务名称').fill(taskName);
+    await page.getByLabel('分享链接').fill('https://yun.139.com/w/#/share/link/mock_139_wrong_code');
+    await page.getByRole('button', { name: '确认并保存' }).click();
+    
+    const taskRow = page.locator('tr').filter({ hasText: taskName });
+    await taskRow.getByRole('button', { name: '运行' }).click();
+
+    await page.waitForTimeout(5000);
+    await page.reload();
+
+    const updatedTaskRow = page.locator('tr').filter({ hasText: taskName });
+    const errorTag = updatedTaskRow.locator('.el-tag--danger').filter({ hasText: 'LINK ERROR' });
+    await expect(errorTag).toBeVisible({ timeout: 15000 });
+    
+    await errorTag.hover();
+    await expect(page.getByText('提取码错误或未提供提取码，请检查后再试。')).toBeVisible();
+  });
+
+  test('夸克网盘：验证未提供提取码场景', async ({ page }) => {
+    const taskName = `Quark_未提码_${Date.now()}`;
+    await page.goto('/tasks');
+    await page.getByRole('button', { name: '创建任务' }).last().click();
+    await page.locator('.el-select').first().click();
+    await page.getByRole('option', { name: 'E2E夸克用户' }).first().click();
+    await page.getByLabel('任务名称').fill(taskName);
+    await page.getByLabel('分享链接').fill('https://pan.quark.cn/s/mock_quark_missing_code');
+    await page.getByRole('button', { name: '确认并保存' }).click();
+    
+    const taskRow = page.locator('tr').filter({ hasText: taskName });
+    await taskRow.getByRole('button', { name: '运行' }).click();
+
+    await page.waitForTimeout(5000);
+    await page.reload();
+
+    const updatedTaskRow = page.locator('tr').filter({ hasText: taskName });
+    const errorTag = updatedTaskRow.locator('.el-tag--danger').filter({ hasText: 'LINK ERROR' });
+    await expect(errorTag).toBeVisible({ timeout: 15000 });
+    
+    await errorTag.hover();
+    await expect(page.getByText('当前分享链接需要提取码，请填写提取码 (code: 41008)')).toBeVisible();
+  });
+
+  test('夸克网盘：验证提取码错误场景', async ({ page }) => {
+    const taskName = `Quark_提码错_${Date.now()}`;
+    await page.goto('/tasks');
+    await page.getByRole('button', { name: '创建任务' }).last().click();
+    await page.locator('.el-select').first().click();
+    await page.getByRole('option', { name: 'E2E夸克用户' }).first().click();
+    await page.getByLabel('任务名称').fill(taskName);
+    await page.getByLabel('分享链接').fill('https://pan.quark.cn/s/mock_quark_wrong_code');
+    await page.getByRole('button', { name: '确认并保存' }).click();
+    
+    const taskRow = page.locator('tr').filter({ hasText: taskName });
+    await taskRow.getByRole('button', { name: '运行' }).click();
+
+    await page.waitForTimeout(5000);
+    await page.reload();
+
+    const updatedTaskRow = page.locator('tr').filter({ hasText: taskName });
+    const errorTag = updatedTaskRow.locator('.el-tag--danger').filter({ hasText: 'LINK ERROR' });
+    await expect(errorTag).toBeVisible({ timeout: 15000 });
+    
+    await errorTag.hover();
+    await expect(page.getByText('提取码错误，请检查后再试 (code: 41007)')).toBeVisible();
+  });
 });

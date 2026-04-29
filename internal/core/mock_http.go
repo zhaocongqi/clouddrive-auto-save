@@ -93,17 +93,29 @@ func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		} else if strings.Contains(url, "mock_invalid") {
 			statusCode = 404
 			respBody = `{"code": 24001, "message": "该分享已失效，可能已被取消或删除。"}`
+		} else if strings.Contains(url, "mock_quark_missing_code") {
+			respBody = `{"code": 41008, "message": "请先输入提取码"}`
+		} else if strings.Contains(url, "mock_quark_wrong_code") {
+			respBody = `{"code": 41007, "message": "提取码错误"}`
 		} else {
 			// 模拟返回文件列表
 			respBody = `{"code": 0, "data": {"list": [{"fid": "file1", "file_name": "[2024.04.20] E2E测试电影.mp4", "size": 1024, "updated_at": 1612345678000, "dir": false, "share_fid_token": "mock_token_1"}, {"fid": "file2", "file_name": "readme.txt", "size": 100, "updated_at": 1612345679000, "dir": false, "share_fid_token": "mock_token_2"}]}}`
 		}
 	} else if strings.Contains(url, "drive-pc.quark.cn/1/clouddrive/share/sharepage/token") {
-		if strings.Contains(url, "mock_violation") {
+		bodyBytes, _ := io.ReadAll(req.Body)
+		req.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+		bodyStr := string(bodyBytes)
+
+		if strings.Contains(bodyStr, "mock_violation") {
 			statusCode = 403
 			respBody = `{"code": 41010, "message": "该分享文件涉及违规内容，已被官方屏蔽。"}`
-		} else if strings.Contains(url, "mock_invalid") {
+		} else if strings.Contains(bodyStr, "mock_invalid") {
 			statusCode = 404
 			respBody = `{"code": 24001, "message": "该分享已失效，可能已被取消或删除。"}`
+		} else if strings.Contains(bodyStr, "mock_quark_missing_code") {
+			respBody = `{"code": 41008, "message": "请先输入提取码"}`
+		} else if strings.Contains(bodyStr, "mock_quark_wrong_code") {
+			respBody = `{"code": 41007, "message": "提取码错误"}`
 		} else {
 			respBody = `{"code": 0, "data": {"stoken": "mock_stoken"}}`
 		}
@@ -172,6 +184,8 @@ func (m *mockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 
 		if strings.Contains(bodyStr, "mock_invalid") {
 			respBody = `{"code": "200000727", "message": "分享链接不存在或已被取消。"}`
+		} else if strings.Contains(bodyStr, "mock_139_wrong_code") {
+			respBody = `{"code": "9188", "message": "提取码校验失败"}`
 		} else {
 			// 提供完整的 path 以确保 ParseShare 和 SaveLink 标识符一致
 			respBody = `{"code": "0", "data": {"coLst": [{"coID": "f1", "contentID": "f1", "parentCatalogID": "root", "path": "root/f1", "coName": "[2024.04.20] E2E测试电影.mp4", "size": 1024, "udTime": "20240420120000"}, {"coID": "f2", "contentID": "f2", "parentCatalogID": "root", "path": "root/f2", "coName": "readme.txt", "size": 100, "udTime": "20240420120100"}], "caLst": []}}`
