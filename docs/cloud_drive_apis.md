@@ -146,6 +146,7 @@
 - **获取分享页详情 (detail)**:
   - `GET /1/clouddrive/share/sharepage/detail`
   - 参数: `pwd_id`, `stoken`, `pdir_fid`。
+  - **重要异常处理**: 当 API 返回 `200 OK` 且 `code: 0` 但 `data.list` 为空时，表示该分享链接已失效、被取消或包含的文件为空，需在解析层主动拦截并阻断后续转存流程。
 - **执行保存 (save)**:
   - `POST /1/clouddrive/share/sharepage/save`
   - Body: `{"fid_list": [...], "fid_token_list": [...], "to_pdir_fid": "目标ID", "pwd_id": "...", "stoken": "..."}`
