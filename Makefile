@@ -103,7 +103,7 @@ lint:
 ## lint-md: 检查 Markdown 格式
 lint-md:
 	@echo "=> Checking Markdown format..."
-	npx markdownlint-cli "**/*.md" --ignore "node_modules" --ignore "web/node_modules"
+	npx markdownlint-cli "**/*.md" --ignore "node_modules" --ignore "web/node_modules" --ignore "e2e/node_modules"
 
 ## vet: 静态分析检查 (go vet)
 vet:
