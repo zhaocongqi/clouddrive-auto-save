@@ -898,7 +898,10 @@ const handleRun = async (row) => {
   try {
     await runTask(row.id)
     // 立即在前端反馈状态，避免等待轮询
-    row.status = 'running'
+    // 增加检查，防止覆盖已经由 SSE 更新的成功状态
+    if (row.status !== 'success') {
+      row.status = 'running'
+    }
     ElMessage.success('任务已提交执行队列')
   } catch (err) {
     // 错误已由拦截器展示
@@ -914,7 +917,7 @@ const handleRunAll = async () => {
     // 立即在前端反馈所有满足条件的任务状态
     taskList.value.forEach(task => {
       const isFatal = task.message && task.message.includes('[Fatal]')
-      if (task.status !== 'running' && !isFatal) {
+      if (task.status !== 'running' && task.status !== 'success' && !isFatal) {
         task.status = 'running'
       }
     })
