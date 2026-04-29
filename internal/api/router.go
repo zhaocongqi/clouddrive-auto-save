@@ -13,10 +13,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/zcq/clouddrive-auto-save/internal/core"
 	_ "github.com/zcq/clouddrive-auto-save/internal/core/cloud139"
+	"github.com/zcq/clouddrive-auto-save/internal/core/notify"
 	_ "github.com/zcq/clouddrive-auto-save/internal/core/quark"
 	"github.com/zcq/clouddrive-auto-save/internal/core/scheduler"
 	"github.com/zcq/clouddrive-auto-save/internal/core/worker"
-	"github.com/zcq/clouddrive-auto-save/internal/core/notify"
 	"github.com/zcq/clouddrive-auto-save/internal/db"
 	"github.com/zcq/clouddrive-auto-save/internal/utils"
 )
@@ -602,4 +602,3 @@ func testBarkNotification(c *gin.Context) {
 	}
 	c.PureJSON(http.StatusOK, gin.H{"message": "test notification sent"})
 }
-
