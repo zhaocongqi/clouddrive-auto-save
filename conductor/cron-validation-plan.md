@@ -1,19 +1,28 @@
-# 优化 Cron 输入校验计划
+# 全局 Cron 表达式校验增强计划 (Enhanced Cron Validation Plan)
 
-**目标：** 通过在前端提供引导提示以及在后端增加 API 拦截，验证自定义 Cron 表达式，提升用户体验和系统稳定性。
+## 背景与目标 (Objective)
+在“高级 Cron”模式下，用户输入非法的 Cron 表达式时，前端缺乏即时校验，后端在 `updateGlobalSettings` 接口中也未进行格式检查。这会导致无效配置入库并可能引发调度器错误。
+目标是在后端接口增加格式校验，并在前端提供明确的错误反馈。
 
-**修改内容：**
+## 关键文件 (Key Files & Context)
+- `internal/api/router.go`: `updateGlobalSettings` 接口。
+- `web/src/views/Settings.vue`: 设置页面保存逻辑。
 
-## 1. 后端逻辑 (`internal/core/scheduler/scheduler.go`)
+## 实施步骤 (Implementation Steps)
 
-- 实现 `ValidateCron(cronExpr string) error` 函数。通过临时实例化
-  `cron.New(cron.WithSeconds())` 并尝试添加该表达式来捕获解析错误。
+### 1. 后端接口校验
+修改 `internal/api/router.go` 中的 `updateGlobalSettings` 函数：
+- 在保存 `global_schedule_cron` 之前，判断是否同时开启了全局调度。
+- 如果开启，则调用 `scheduler.ValidateCron` 进行校验。
+- 校验失败则返回 `400 Bad Request` 并附带具体错误信息。
 
-### 2. 后端 API (`internal/api/router.go`)
+### 2. 前端保存逻辑优化
+修改 `web/src/views/Settings.vue`：
+- 优化 `saveSettings` 函数：当 API 返回错误时，从 `error.response.data.error` 中提取具体的错误原因并显示给用户（例如通过 `ElMessage.error`）。
+- 考虑在 `advanced` 模式下增加前端初步校验（可选，优先保证后端强校验）。
 
-- 在创建、更新任务及修改全局设置时，调用该校验函数。如果格式非法，返回 `400 Bad Request` 并提供具体的错误描述。
-
-### 3. 前端 UI (`web/src/views/Tasks.vue`)
-
-- 为 Cron 输入框增加清晰的占位符（如 `秒 分 时 日 月 周`）。
-- 增加 Tooltip 提示，解释 6 位表达式的格式，极大降低使用门槛。
+## 验证与测试 (Verification & Testing)
+1. 进入“系统设置” -> “高级 Cron”。
+2. 输入一个明显错误的表达式（如 `abc` 或 `* * *` 少于 5 位）。
+3. 失去焦点或按回车触发保存。
+4. 验证是否弹出红色的错误提示，且该非法值未成功应用到系统调度中。
