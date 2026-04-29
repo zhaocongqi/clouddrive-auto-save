@@ -595,7 +595,16 @@ func updateGlobalSettings(c *gin.Context) {
 }
 
 func testBarkNotification(c *gin.Context) {
-	err := notify.SendBark("测试通知", "这是一条来自 UCAS 的测试推送消息。")
+	var input struct {
+		Server string `json:"bark_server"`
+		Key    string `json:"bark_device_key"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	err := notify.SendBarkDirect(input.Server, input.Key, "测试通知", "这是一条来自 UCAS 的测试推送消息。")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
