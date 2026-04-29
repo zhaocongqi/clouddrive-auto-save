@@ -27,7 +27,7 @@ func NewBroadcaster() *Broadcaster {
 		clients:    make(map[chan string]bool),
 		register:   make(chan chan string),
 		unregister: make(chan chan string),
-		messages:   make(chan string, 100),
+		messages:   make(chan string, 1000),
 		history:    make([]string, 0, 50),
 	}
 }
@@ -70,7 +70,7 @@ func (b *Broadcaster) run() {
 
 // Subscribe 注册一个新客户端
 func (b *Broadcaster) Subscribe() chan string {
-	client := make(chan string, 10)
+	client := make(chan string, 100)
 	b.register <- client
 	return client
 }
