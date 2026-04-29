@@ -598,6 +598,10 @@ func (q *Quark) ParseShare(ctx context.Context, shareURL, extractCode string) ([
 		return nil, err
 	}
 
+	if len(detailRes.Data.List) == 0 {
+		return nil, fmt.Errorf("[Fatal] 夸克分享链接无效、已取消或包含的文件为空")
+	}
+
 	var files []core.FileInfo
 	for _, item := range detailRes.Data.List {
 		updateTime := time.Unix(item.UpdateAt/1000, 0)
