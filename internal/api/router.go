@@ -16,6 +16,7 @@ import (
 	_ "github.com/zcq/clouddrive-auto-save/internal/core/quark"
 	"github.com/zcq/clouddrive-auto-save/internal/core/scheduler"
 	"github.com/zcq/clouddrive-auto-save/internal/core/worker"
+	"github.com/zcq/clouddrive-auto-save/internal/core/notify"
 	"github.com/zcq/clouddrive-auto-save/internal/db"
 	"github.com/zcq/clouddrive-auto-save/internal/utils"
 )
@@ -54,6 +55,9 @@ func InitRouter(wm *worker.Manager) *gin.Engine {
 
 		api.GET("/settings/schedule", getScheduleSettings)
 		api.POST("/settings/schedule", updateScheduleSettings)
+		api.GET("/settings/global", getGlobalSettings)
+		api.POST("/settings/global", updateGlobalSettings)
+		api.POST("/settings/test_bark", testBarkNotification)
 	}
 
 	// 静态资源处理
@@ -554,3 +558,48 @@ func updateScheduleSettings(c *gin.Context) {
 
 	c.PureJSON(http.StatusOK, gin.H{"message": "settings updated"})
 }
+
+func getGlobalSettings(c *gin.Context) {
+	var settings []db.Setting
+	db.DB.Find(&settings)
+
+	res := make(map[string]string)
+	for _, s := range settings {
+		res[s.Key] = s.Value
+	}
+	c.PureJSON(http.StatusOK, res)
+}
+
+func updateGlobalSettings(c *gin.Context) {
+	var input map[string]string
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	for k, v := range input {
+		db.DB.Save(&db.Setting{Key: k, Value: v})
+		// 如果更新了定时任务配置，同步更新调度器
+		if k == "global_schedule_enabled" || k == "global_schedule_cron" {
+			var enabledSetting db.Setting
+			var cronSetting db.Setting
+			db.DB.Where("key = ?", "global_schedule_enabled").First(&enabledSetting)
+			db.DB.Where("key = ?", "global_schedule_cron").First(&cronSetting)
+			scheduler.Global.UpdateGlobalSchedule(cronSetting.Value, enabledSetting.Value == "true")
+		}
+	}
+
+	// 推送统计更新
+	utils.BroadcastStatsUpdate()
+	c.PureJSON(http.StatusOK, gin.H{"message": "settings updated"})
+}
+
+func testBarkNotification(c *gin.Context) {
+	err := notify.SendBark("测试通知", "这是一条来自 UCAS 的测试推送消息。")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.PureJSON(http.StatusOK, gin.H{"message": "test notification sent"})
+}
+
