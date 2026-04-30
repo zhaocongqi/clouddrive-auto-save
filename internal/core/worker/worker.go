@@ -90,6 +90,7 @@ func (m *Manager) updateProgress(task *db.Task, percent int, stage, message stri
 }
 
 func (m *Manager) execute(task *db.Task) {
+	startTime := time.Now()
 	slog.Info("正在执行任务", "name", task.Name, "id", task.ID)
 	m.updateProgress(task, 5, "Started", "任务已进入执行队列")
 
@@ -98,7 +99,7 @@ func (m *Manager) execute(task *db.Task) {
 
 	driver := core.GetDriver(&task.Account)
 	if driver == nil {
-		m.finishTask(task, "failed", "Driver not found", nil)
+		m.finishTask(task, "failed", "Driver not found", nil, startTime)
 		return
 	}
 
@@ -106,7 +107,7 @@ func (m *Manager) execute(task *db.Task) {
 	m.updateProgress(task, 15, "Parsing", "正在解析分享链接...")
 	files, err := driver.ParseShare(m.ctx, task.ShareURL, task.ExtractCode)
 	if err != nil {
-		m.finishTask(task, "failed", "解析分享失败: "+err.Error(), nil)
+		m.finishTask(task, "failed", "解析分享失败: "+err.Error(), nil, startTime)
 		return
 	}
 
@@ -135,13 +136,13 @@ func (m *Manager) execute(task *db.Task) {
 	m.updateProgress(task, 35, "Checking", "正在检查目标目录是否存在同名文件...")
 	targetID, err := driver.PrepareTargetPath(m.ctx, task.SavePath)
 	if err != nil {
-		m.finishTask(task, "failed", "准备目标路径失败: "+err.Error(), nil)
+		m.finishTask(task, "failed", "准备目标路径失败: "+err.Error(), nil, startTime)
 		return
 	}
 
 	existingFiles, err := driver.ListFiles(m.ctx, targetID)
 	if err != nil {
-		m.finishTask(task, "failed", "列出目标目录失败: "+err.Error(), nil)
+		m.finishTask(task, "failed", "列出目标目录失败: "+err.Error(), nil, startTime)
 		return
 	}
 
@@ -201,14 +202,14 @@ func (m *Manager) execute(task *db.Task) {
 			msg += fmt.Sprintf(", 过滤 %d 个不匹配文件", regexSkipCount)
 		}
 		msg += ")"
-		m.finishTask(task, "success", msg, nil)
+		m.finishTask(task, "success", msg, nil, startTime)
 		return
 	}
 
 	m.updateProgress(task, 60, "Saving", fmt.Sprintf("正在转存 %d 个文件...", len(filteredIDs)))
 	err = driver.SaveLink(m.ctx, task.ShareURL, task.ExtractCode, task.SavePath, filteredIDs)
 	if err != nil {
-		m.finishTask(task, "failed", "转存失败: "+err.Error(), nil)
+		m.finishTask(task, "failed", "转存失败: "+err.Error(), nil, startTime)
 		return
 	}
 
@@ -232,10 +233,10 @@ func (m *Manager) execute(task *db.Task) {
 		}
 	}
 
-	m.finishTask(task, "success", fmt.Sprintf("转存成功 (新增 %d 个文件, 跳过 %d 个同名文件)", len(filteredIDs), skipCount), savedFileNames)
+	m.finishTask(task, "success", fmt.Sprintf("转存成功 (新增 %d 个文件, 跳过 %d 个同名文件)", len(filteredIDs), skipCount), savedFileNames, startTime)
 }
 
-func (m *Manager) finishTask(task *db.Task, status, message string, files []string) {
+func (m *Manager) finishTask(task *db.Task, status, message string, files []string, startTime time.Time) {
 	task.Status = status
 	task.Message = message
 	task.LastRun = time.Now()
@@ -246,6 +247,8 @@ func (m *Manager) finishTask(task *db.Task, status, message string, files []stri
 		task.Stage = "Failed"
 	}
 
+	duration := time.Since(startTime)
+
 	m.db.Model(task).Updates(map[string]interface{}{
 		"status":   status,
 		"message":  message,
@@ -253,11 +256,11 @@ func (m *Manager) finishTask(task *db.Task, status, message string, files []stri
 		"percent":  task.Percent,
 		"stage":    task.Stage,
 	})
-	slog.Info("任务完成", "id", task.ID, "status", status)
+	slog.Info("任务完成", "id", task.ID, "status", status, "duration", duration)
 	slog.Info(fmt.Sprintf("[PROGRESS:%d:100:%s:%s]", task.ID, task.Stage, message))
 	utils.BroadcastTaskUpdate(task)
 	utils.BroadcastStatsUpdate()
 
 	// 触发 Bark 通知
-	notify.SendTaskNotification(task.Name, status, message, files)
+	notify.SendTaskNotification(task.Name, status, message, files, duration)
 }
