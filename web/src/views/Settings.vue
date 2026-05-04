@@ -496,6 +496,7 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  min-height: 32px;
 }
 
 .header-title {
