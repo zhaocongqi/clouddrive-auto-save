@@ -22,7 +22,7 @@ type BarkPayload struct {
 	Icon      string `json:"icon,omitempty"`
 	Group     string `json:"group,omitempty"`
 	URL       string `json:"url,omitempty"`
-	IsArchive int    `json:"isArchive,omitempty"`
+	IsArchive int    `json:"isArchive"`
 }
 
 // SendBark 发送 Bark 推送
@@ -85,6 +85,8 @@ func SendBarkDirect(server, key, title, body, level, sound, icon, archive string
 		return err
 	}
 
+	slog.Debug("Bark 推送请求", "url", fmt.Sprintf("%s/push", server), "body", string(jsonData))
+
 	// 构造推送 URL
 	pushURL := fmt.Sprintf("%s/push", server)
 	req, err := http.NewRequest("POST", pushURL, bytes.NewBuffer(jsonData))
@@ -146,8 +148,6 @@ func SendTaskNotification(taskName string, status string, message string, files 
 		db.DB.Where("key = ?", "bark_failure_sound").First(&soundSetting)
 		if soundSetting.Value != "" && soundSetting.Value != "default" {
 			sound = soundSetting.Value
-		} else if soundSetting.Value == "default" {
-			sound = ""
 		}
 	} else {
 		db.DB.Where("key = ?", "bark_success_level").First(&levelSetting)
@@ -157,8 +157,6 @@ func SendTaskNotification(taskName string, status string, message string, files 
 		db.DB.Where("key = ?", "bark_success_sound").First(&soundSetting)
 		if soundSetting.Value != "" && soundSetting.Value != "default" {
 			sound = soundSetting.Value
-		} else if soundSetting.Value == "default" {
-			sound = ""
 		}
 	}
 
