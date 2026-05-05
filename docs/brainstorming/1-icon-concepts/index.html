@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>图标方案对比</title>
+    <style>
+        body { font-family: sans-serif; background: #f0f2f5; padding: 40px; display: flex; gap: 30px; justify-content: center; }
+        .card { background: white; border-radius: 16px; padding: 32px; width: 300px; box-shadow: 0 8px 24px rgba(0,0,0,0.08); text-align: center; }
+        .icon-box { width: 140px; height: 140px; margin: 0 auto 24px; display: flex; align-items: center; justify-content: center; border-radius: 28px; }
+        .c1 { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+        .c2 { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .c3 { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+        .badge { background: #e6f4ff; color: #1677ff; padding: 4px 12px; border-radius: 6px; margin-bottom: 16px; display: inline-block; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="icon-box c1">
+            <svg width="80" height="80" viewBox="0 0 24 24" fill="white">
+                <path d="M17.5 19c-2.485 0-4.5-2.015-4.5-4.5s2.015-4.5 4.5-4.5 4.5 2.015 4.5 4.5-2.015 4.5-4.5 4.5zM7.5 19C4.462 19 2 16.538 2 13.5 2 10.462 4.462 8 7.5 8c.668 0 1.308.119 1.9.336C10.513 5.762 13.049 4 16 4c3.866 0 7 3.134 7 7 0 .443-.041.876-.12 1.295-.273-.188-.6-.295-.955-.295-.511 0-.975.216-1.304.56-.821-1.548-2.46-2.56-4.346-2.56-2.118 0-3.894 1.272-4.631 3.076-.506-.667-1.324-1.076-2.244-1.076-1.05 0-1.9.851-1.9 1.9V19h0z"/>
+            </svg>
+        </div>
+        <div class="badge">方案 A</div>
+        <h3>层叠云朵</h3>
+        <p>适合云盘转存主题，圆润稳重。</p>
+    </div>
+    <div class="card">
+        <div class="icon-box c2">
+            <svg width="80" height="80" viewBox="0 0 24 24" fill="white">
+                <path d="M3 9c0-1.657 1.343-3 3-3h3.586c.53 0 1.039.211 1.414.586L13.414 9H21v8c0 1.657-1.343 3-3 3H6c-1.657 0-3-1.343-3-3V9z"/>
+                <circle cx="16" cy="14.5" r="3" stroke="#764ba2" stroke-width="1.5"/>
+            </svg>
+        </div>
+        <div class="badge">方案 B</div>
+        <h3>智能文件夹</h3>
+        <p>强调自动整理与同步，专业度高。</p>
+    </div>
+    <div class="card">
+        <div class="icon-box c3">
+            <svg width="80" height="80" viewBox="0 0 24 24" stroke="white" stroke-width="2" fill="none">
+                <path d="M12 2L3 7v10l9 5 9-5V7l-9-5z"/>
+                <path d="M12 22v-10M21 7l-9 5L3 7"/>
+            </svg>
+        </div>
+        <div class="badge">方案 C</div>
+        <h3>数据立方</h3>
+        <p>强调高性能引擎，科技感强。</p>
+    </div>
+</body>
+</html>
