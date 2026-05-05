@@ -32,4 +32,21 @@ const props = defineProps({
   display: inline-block;
   filter: drop-shadow(0 8px 16px rgba(79, 172, 254, 0.2));
 }
+
+.core-node {
+  animation: breathe 3s ease-in-out infinite;
+}
+
+@keyframes breathe {
+  0%, 100% { fill-opacity: 0.4; transform: scale(0.95); transform-origin: 70px 55px; }
+  50% { fill-opacity: 1; transform: scale(1.05); transform-origin: 70px 55px; }
+}
+
+.main-cloud {
+  transition: filter 0.3s ease;
+}
+
+.cloud-logo:hover .main-cloud {
+  filter: brightness(1.1);
+}
 </style>
