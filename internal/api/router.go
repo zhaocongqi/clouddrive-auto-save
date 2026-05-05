@@ -2,6 +2,8 @@ package api
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"log/slog"
@@ -418,8 +420,10 @@ func runAllTasks(c *gin.Context) {
 		return
 	}
 
-	// 生成批次 ID 并注册
-	batchID := fmt.Sprintf("batch_%d", time.Now().UnixMilli())
+	// 生成批次 ID（时间戳 + 随机后缀，确保唯一性）
+	randBytes := make([]byte, 4)
+	rand.Read(randBytes)
+	batchID := fmt.Sprintf("batch_%d_%s", time.Now().UnixMilli(), hex.EncodeToString(randBytes))
 	WorkerManager.RegisterBatch(batchID, len(tasks))
 
 	count := 0
