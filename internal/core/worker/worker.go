@@ -23,7 +23,7 @@ type Job struct {
 	BatchID string // 为空表示单任务执行
 }
 
-// Manager 负责管理 Worker 池 and 任务分发
+// Manager 负责管理 Worker 池和任务分发
 type Manager struct {
 	workers  int
 	jobQueue chan Job
