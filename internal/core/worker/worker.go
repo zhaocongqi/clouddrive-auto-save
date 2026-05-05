@@ -65,6 +65,11 @@ func (m *Manager) Submit(job Job) {
 	m.jobQueue <- job
 }
 
+// RegisterBatch 注册一个批量执行批次
+func (m *Manager) RegisterBatch(batchID string, total int) {
+	m.tracker.RegisterBatch(batchID, total)
+}
+
 func (m *Manager) worker(id int) {
 	defer m.wg.Done()
 	slog.Info("Worker 启动", "id", id)
