@@ -44,7 +44,7 @@ docker run -d \
   -p 8080:8080 \
   -v $(pwd)/data:/app/data \
   -e TZ=Asia/Shanghai \
-  zcq98/clouddrive-auto-save:v1.1.1
+  zcq98/clouddrive-auto-save:v1.6.0
 ```
 
 或使用 `docker-compose.yml`:
@@ -52,7 +52,7 @@ docker run -d \
 ```yaml
 services:
   ucas:
-    image: zcq98/clouddrive-auto-save:v1.1.1
+    image: zcq98/clouddrive-auto-save:v1.6.0
     container_name: clouddrive-auto-save
     ports:
       - "8080:8080"
