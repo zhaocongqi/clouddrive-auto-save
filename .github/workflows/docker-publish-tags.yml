@@ -22,7 +22,7 @@ jobs:
         with:
           images: zcq98/clouddrive-auto-save
           tags: |
-            type=semver,pattern={{version}}
+            type=semver,pattern=v{{version}}
             type=raw,value=latest
 
       - name: Set up QEMU
@@ -39,7 +39,7 @@ jobs:
 
       - name: Extract Tag Version
         id: vars
-        run: echo "VERSION_NAME=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+        run: echo "VERSION_NAME=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
 
       - name: Build and Push
         uses: docker/build-push-action@v7.1.0
